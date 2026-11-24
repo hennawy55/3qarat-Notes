@@ -66,14 +66,23 @@ if (isNative) {
       return status.display === 'granted' ? 'granted' : status.display;
     },
 
-    async requestPermission() {
-      const granted = await hasPermission(true);
-      if (granted) await ensureChannel();
+    async registerForPushNotifications() {
       try {
         let push = await PushNotifications.checkPermissions();
         if (push.receive !== 'granted') push = await PushNotifications.requestPermissions();
-        if (push.receive === 'granted') await PushNotifications.register();
-      } catch (error) { console.warn('FCM registration permission:', error); }
+        if (push.receive !== 'granted') return false;
+        await PushNotifications.register();
+        return true;
+      } catch (error) {
+        console.warn('FCM registration permission:', error);
+        return false;
+      }
+    },
+
+    async requestPermission() {
+      const granted = await hasPermission(true);
+      if (granted) await ensureChannel();
+      await this.registerForPushNotifications();
       return granted;
     },
 
