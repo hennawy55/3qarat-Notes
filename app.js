@@ -34,9 +34,8 @@
     if(startupNotificationPermissionRequested)return;startupNotificationPermissionRequested=true;
     try{
       if(window.smartNoteNativeNotifications?.isNative){if(window.smartNoteNativeNotifications.getPermissionStatus){const status=await window.smartNoteNativeNotifications.getPermissionStatus();if(status==='granted'||status?.granted)return}const granted=await window.smartNoteNativeNotifications.requestPermission();if(granted){await syncNativeTaskReminders();checkTaskNotifications()}return}
-      if(!('Notification'in window)||Notification.permission==='denied'||!window.isSecureContext||!('serviceWorker'in navigator))return;
-      if(Notification.permission==='granted'){serviceWorkerRegistration=await navigator.serviceWorker.ready;checkTaskNotifications();return}
-      const permission=await Notification.requestPermission();if(permission==='granted'){serviceWorkerRegistration=await navigator.serviceWorker.ready;checkTaskNotifications()}
+      // System notifications are intentionally mobile-app only; web stays in-app.
+      return;
     }catch(error){console.warn('Notification permission request was unavailable:',error)}
   }
   function unlockNotificationAudio(){if(notificationAudio){if(notificationAudio.state==='suspended')notificationAudio.resume().catch(()=>toast('تعذر تشغيل صوت التنبيه في هذا المتصفح'));return}const AudioContextClass=window.AudioContext||window.webkitAudioContext;if(!AudioContextClass)return;try{notificationAudio=new AudioContextClass();if(notificationAudio.state==='suspended')notificationAudio.resume().catch(()=>toast('تعذر تشغيل صوت التنبيه في هذا المتصفح'))}catch(err){toast('تعذر تفعيل صوت التنبيه: '+err.message)}}
@@ -59,7 +58,7 @@
     showView('tasks');
     openForm('task',alert.taskId);
   }
-  async function sendSystemTaskNotification(alert){if(window.smartNoteNativeNotifications?.isNative){return}if(!('Notification'in window)||Notification.permission!=='granted')return;if(!serviceWorkerRegistration&&'serviceWorker'in navigator)serviceWorkerRegistration=await navigator.serviceWorker.ready;if(!serviceWorkerRegistration||typeof serviceWorkerRegistration.showNotification!=='function')throw new Error('إشعارات النظام غير مدعومة أو Service Worker غير جاهز');const taskTitle=get('tasks',alert.taskId)?.title||alert.body,tag=`task-title:${encodeURIComponent(taskAlertTitleKey(taskTitle))}`,options={body:`${alert.title}: ${alert.body}`,tag,data:{taskId:alert.taskId,key:alert.key}};try{await serviceWorkerRegistration.showNotification('دفتر العقارات الذكي',options)}catch(err){options.tag=alert.key;await serviceWorkerRegistration.showNotification(alert.title,options)}browserNotifications.set(alert.key,{close:()=>serviceWorkerRegistration.getNotifications({tag:options.tag}).then(notifications=>notifications.forEach(notification=>notification.close()))})}
+  async function sendSystemTaskNotification(alert){if(!window.smartNoteNativeNotifications?.isNative)return;}
   function sendTaskNotification(task,type,title,body){const key=`${task.id}:${type}:${type==='due'?taskDueTimestamp(task):task.startedAt}`;if(notifiedTaskReminders.has(key))return;notifiedTaskReminders.add(key);const titleKey=taskAlertTitleKey(task.title);taskAlerts.filter(alert=>taskAlertTitleKey(alert.taskTitle||get('tasks',alert.taskId)?.title||alert.body)===titleKey).forEach(alert=>{closeBrowserNotification(alert.key);taskAlerts.splice(taskAlerts.indexOf(alert),1)});const alert={key,taskId:task.id,title,body,taskTitle:task.title,createdAt:Date.now(),isRead:false};taskAlerts.push(alert);if(!window.smartNoteNativeNotifications?.isNative&&'Notification'in window&&Notification.permission==='granted')sendSystemTaskNotification(alert).catch(err=>toast('تعذر إرسال إشعار النظام: '+err.message));persistTaskAlertState();renderTaskAlerts();if(!document.hidden)playNotificationSound()}
   function checkTaskNotifications(){const now=Date.now();if(!isReady||false)return;for(const task of db.tasks){if(task.status==='مكتملة')continue;const due=taskDueTimestamp(task);if(task.status!=='قيد التنفيذ'&&Number.isFinite(due)&&now>=due)sendTaskNotification(task,'due','المتابعة ما زالت معلقة',`حان موعد المتابعة: ${task.title}`);if(task.status==='قيد التنفيذ'&&task.startedAt&&now-Date.parse(task.startedAt)>=60*60*1000)sendTaskNotification(task,'in_progress','هل ما زلت تعمل على المتابعة؟',`مرّت ساعة على بدء: ${task.title}. افتح المتابعة وغيّر حالتها إلى مكتملة إذا انتهيت.`)}}
   function get(type,id){return db[type]?.find(x=>x.id===id)}
@@ -406,11 +405,7 @@
     if(!notification||notification.isRead)return;
     const options={id:notification.id,title:notification.title||assignmentText('إشعار جديد','New notification'),body:notification.body||'',assignmentId:notification.assignmentId||'',notificationId:notification.id};
     try{
-      if(window.smartNoteNativeNotifications?.isNative&&window.smartNoteNativeNotifications.showInstantNotification){await window.smartNoteNativeNotifications.showInstantNotification(options);return}
-      if('Notification'in window&&Notification.permission==='granted'&&'serviceWorker'in navigator){
-        if(!serviceWorkerRegistration)serviceWorkerRegistration=await navigator.serviceWorker.ready;
-        await serviceWorkerRegistration?.showNotification(options.title,{body:options.body,tag:'smartnote-server:'+options.id,data:{assignmentId:options.assignmentId,notificationId:options.notificationId}});
-      }
+      if(window.smartNoteNativeNotifications?.isNative&&window.smartNoteNativeNotifications.showInstantNotification){await window.smartNoteNativeNotifications.showInstantNotification(options)}
     }catch(error){console.warn('Could not display system notification:',error)}
   }
   async function refreshUnifiedNotifications(loadOlder=false,announceNew=false){
@@ -423,27 +418,56 @@
     }catch(error){if(!loadOlder)serverNotifications=[];toast(t('تعذر تحميل الإشعارات: ','Could not load notifications: ')+error.message)}
     renderUnifiedNotifications();
   }
+  function notificationEntityLabel(n){
+    if(n.kind==='local'){
+      const task=get('tasks',n.taskId);if(!task)return assignmentText('متابعة','Task')+': '+(n.taskTitle||n.body||'');
+      for(const [field,type] of [['clientId','clients'],['projectId','projects'],['unitId','units']]){const item=task[field]&&get(type,task[field]);if(item)return assignmentText(type==='clients'?'عميل':type==='projects'?'مشروع':'وحدة',type==='clients'?'Client':type==='projects'?'Project':'Unit')+': '+(item.name||item.title||'')}
+      return assignmentText('متابعة','Task')+': '+(task.title||'');
+    }
+    const labels={assigned:['متابعة','Follow-up'],reassigned:['متابعة','Follow-up'],reassignment_request:['طلب نقل','Transfer request'],reassignment_result:['طلب نقل','Transfer request'],assignment_completed:['متابعة','Follow-up'],note_added:['ملاحظة','Note']};
+    const label=labels[n.type]||['إشعار','Notification'];return assignmentText(label[0],label[1])+': '+(n.assignmentTitle||n.body||n.title||'');
+  }
+  function notificationDateParts(value){
+    const date=new Date(value);if(Number.isNaN(date.getTime()))return {date:'',time:''};
+    const locale=document.documentElement.lang==='en'?'en-US':'ar-EG';
+    return {date:date.toLocaleDateString(locale,{day:'numeric',month:'short',year:'numeric'}),time:date.toLocaleTimeString(locale,{hour:'2-digit',minute:'2-digit'})};
+  }
   function renderUnifiedNotifications(){
-    const t=assignmentText,all=[...taskAlerts.map(a=>({id:'local:'+a.key,kind:'local',title:a.title,body:a.body,createdAt:a.createdAt,isRead:!!a.isRead,taskId:a.taskId,key:a.key})),...serverNotifications.map(n=>({...n,kind:'server'}))].sort((a,b)=>(Date.parse(b.createdAt)||Number(b.createdAt)||0)-(Date.parse(a.createdAt)||Number(a.createdAt)||0));
-    const unread=taskAlerts.filter(n=>!n.isRead).length+serverNotificationUnreadCount,list=document.getElementById('taskAlerts'),more=document.getElementById('notificationLoadMore');
+    const t=assignmentText,all=[...taskAlerts.map(a=>({id:'local:'+a.key,kind:'local',title:a.title,body:a.body,taskTitle:a.taskTitle,createdAt:a.createdAt,isRead:!!a.isRead,taskId:a.taskId,key:a.key})),...serverNotifications.map(n=>({...n,kind:'server'}))].sort((a,b)=>(Date.parse(b.createdAt)||Number(b.createdAt)||0)-(Date.parse(a.createdAt)||Number(a.createdAt)||0));
+    const unread=taskAlerts.filter(n=>!n.isRead).length+serverNotificationUnreadCount,list=document.getElementById('taskAlerts'),more=document.getElementById('notificationLoadMore'),markAll=document.getElementById('notificationMarkAll');
     document.getElementById('notificationCount').textContent=unread;document.getElementById('notificationCount').hidden=!unread;document.getElementById('notificationPanelCount').textContent='('+(taskAlerts.length+serverNotificationTotalCount)+')';document.getElementById('notificationBell').setAttribute('aria-label',t('الإشعارات: ','Notifications: ')+unread);
+    if(markAll){markAll.disabled=!unread;markAll.textContent=t('تحديد الجميع كمقروءة','Mark all as read')}
     if(more){more.hidden=!serverNotificationHasMore;more.disabled=false;more.textContent=t('تحميل إشعارات أقدم','Load older notifications')}
-    list.innerHTML=all.length?all.map(n=>'<article class="task-alert '+(n.isRead?'is-read':'is-unread')+'" role="button" tabindex="0" data-unified-open="'+esc(n.id)+'" data-kind="'+n.kind+'" data-assignment="'+esc(n.assignmentId||'')+'" data-task="'+esc(n.taskId||'')+'" aria-label="'+esc(t('فتح الإشعار: ','Open notification: ')+n.title)+'"><div class="unified-notice-head"><h3>'+esc(n.title)+'</h3>'+(n.isRead?'':'<span class="unread-dot" aria-label="'+t('غير مقروء','Unread')+'"></span>')+'</div><p>'+esc(n.body)+'</p><small>'+assignmentDate(n.createdAt)+'</small></article>').join(''):'<div class="notification-empty">'+t('لا توجد إشعارات حالياً','No notifications yet')+'</div>';
+    list.innerHTML=all.length?all.map(n=>{const dt=notificationDateParts(n.createdAt),entity=notificationEntityLabel(n),shortBody=String(n.body||'').replace(/\s+/g,' ').trim();return '<article class="task-alert '+(n.isRead?'is-read':'is-unread')+'" tabindex="0" data-unified-open="'+esc(n.id)+'" data-kind="'+n.kind+'" data-assignment="'+esc(n.assignmentId||'')+'" data-task="'+esc(n.taskId||'')+'" aria-label="'+esc(t('فتح الإشعار: ','Open notification: ')+n.title)+'"><div class="unified-notice-head"><p class="notice-summary">'+esc(shortBody)+'</p><time class="notice-time" datetime="'+esc(new Date(n.createdAt).toISOString())+'"><span>'+esc(dt.date)+'</span><span>'+esc(dt.time)+'</span></time><span class="notice-menu-wrap"><button class="notice-menu-toggle" type="button" aria-label="'+t('خيارات الإشعار','Notification options')+'" aria-expanded="false" data-notice-menu="'+esc(n.id)+'"><i data-lucide="chevron-down"></i></button><span class="notice-menu" hidden><button type="button" data-notice-read="'+esc(n.id)+'">'+(n.isRead?t('مقروءة','Read'):t('تحديد كمقروء','Mark as read'))+'</button><button type="button" class="danger" data-notice-delete="'+esc(n.id)+'">'+t('حذف','Delete')+'</button></span></span>'+(n.isRead?'':'<span class="unread-dot" aria-label="'+t('غير مقروء','Unread')+'"></span>')+'</div><div class="notice-entity">'+esc(entity)+'</div></article>'}).join(''):'<div class="notification-empty">'+t('لا توجد إشعارات حالياً','No notifications yet')+'</div>';
+    if(window.lucide)window.lucide.createIcons({attrs:{'stroke-width':1.8}});
+  }
+  async function setUnifiedNotificationRead(id){
+    if(id.startsWith('local:')){const alert=taskAlerts.find(x=>x.key===id.slice(6));if(alert&&!alert.isRead){alert.isRead=true;persistTaskAlertState()}}
+    else{const item=serverNotifications.find(x=>x.id===id);if(item&&!item.isRead){await apiPost({action:'notification_read',notificationId:id});item.isRead=true;serverNotificationUnreadCount=Math.max(0,serverNotificationUnreadCount-1)}}
+    renderUnifiedNotifications();
+  }
+  async function deleteUnifiedNotification(id){
+    if(id.startsWith('local:')){removeTaskAlert(id.slice(6))}
+    else{await apiPost({action:'notification_delete',notificationId:id});serverNotifications=serverNotifications.filter(x=>x.id!==id);serverNotificationTotalCount=Math.max(0,serverNotificationTotalCount-1);const itemWasUnread=serverNotifications.find(x=>x.id===id);if(itemWasUnread&&!itemWasUnread.isRead)serverNotificationUnreadCount=Math.max(0,serverNotificationUnreadCount-1)}
+    renderUnifiedNotifications();
   }
   async function handleUnifiedNotificationClick(e){
+    const menu=e.target.closest('[data-notice-menu]');if(menu){e.stopPropagation();const wrap=menu.closest('.notice-menu-wrap'),panel=wrap.querySelector('.notice-menu'),open=panel.hidden;document.querySelectorAll('.notice-menu').forEach(x=>x.hidden=true);document.querySelectorAll('.notice-menu-toggle').forEach(x=>x.setAttribute('aria-expanded','false'));panel.hidden=!open;menu.setAttribute('aria-expanded',String(open));return}
+    const read=e.target.closest('[data-notice-read]');if(read){e.stopPropagation();try{await setUnifiedNotificationRead(read.dataset.noticeRead)}catch(err){toast(err.message)}return}
+    const del=e.target.closest('[data-notice-delete]');if(del){e.stopPropagation();try{await deleteUnifiedNotification(del.dataset.noticeDelete)}catch(err){toast(err.message)}return}
     const card=e.target.closest('[data-unified-open]');if(!card)return;
     try{
-      if(card.dataset.kind==='local'){
-        const alert=taskAlerts.find(x=>x.key===card.dataset.unifiedOpen.replace('local:',''));
-        if(alert){alert.isRead=true;closeBrowserNotification(alert.key);persistTaskAlertState();document.getElementById('notificationPanel').hidden=true;showView('tasks');openForm('task',alert.taskId)}
-      }else{
-        const item=serverNotifications.find(x=>x.id===card.dataset.unifiedOpen);
-        if(item&&!item.isRead){await apiPost({action:'notification_read',notificationId:card.dataset.unifiedOpen});item.isRead=true;serverNotificationUnreadCount=Math.max(0,serverNotificationUnreadCount-1);}
-        document.getElementById('notificationPanel').hidden=true;
-        if(card.dataset.assignment){showView('assigned');await openAssignedDetail(card.dataset.assignment)}
-      }
+      await setUnifiedNotificationRead(card.dataset.unifiedOpen);
+      if(card.dataset.kind==='local'){const alert=taskAlerts.find(x=>x.key===card.dataset.unifiedOpen.replace('local:',''));document.getElementById('notificationPanel').hidden=true;if(alert){showView('tasks');openForm('task',alert.taskId)}}
+      else{document.getElementById('notificationPanel').hidden=true;if(card.dataset.assignment){showView('assigned');await openAssignedDetail(card.dataset.assignment)}}
       document.getElementById('notificationBell').setAttribute('aria-expanded','false');
-      renderUnifiedNotifications();
+    }catch(err){toast(err.message)}
+  }
+  async function markAllUnifiedNotificationsRead(){
+    try{
+      let changed=0;for(const alert of taskAlerts){if(!alert.isRead){alert.isRead=true;changed++}}
+      if(serverNotificationUnreadCount>0){await apiPost({action:'notification_read_all'});serverNotifications.forEach(item=>item.isRead=true);serverNotificationUnreadCount=0}
+      if(changed)persistTaskAlertState();renderUnifiedNotifications();
     }catch(err){toast(err.message)}
   }
   document.getElementById('taskAlerts').addEventListener('keydown',event=>{if((event.key==='Enter'||event.key===' ')&&event.target.closest('[data-unified-open]')){event.preventDefault();handleUnifiedNotificationClick(event)}});
@@ -520,6 +544,7 @@
   document.getElementById('retryConnection').onclick=initializeCloud;
   document.getElementById('notificationBell').onclick=async()=>{const panel=document.getElementById('notificationPanel'),open=panel.hidden;panel.hidden=!open;document.getElementById('notificationBell').setAttribute('aria-expanded',String(open));if(open)await refreshUnifiedNotifications()};
   document.getElementById('taskAlerts').addEventListener('click',handleUnifiedNotificationClick);
+  document.getElementById('notificationMarkAll')?.addEventListener('click',markAllUnifiedNotificationsRead);
   document.getElementById('notificationLoadMore')?.addEventListener('click',async event=>{const button=event.currentTarget;if(button.disabled||!serverNotificationHasMore)return;button.disabled=true;button.textContent=assignmentText('جارٍ التحميل...','Loading...');await refreshUnifiedNotifications(true)});
   // Alert action handlers are attached directly in renderTaskAlerts for reliable Android WebView taps.
   document.addEventListener('click',event=>{if(!event.target.closest('.notification-center')){document.getElementById('notificationPanel').hidden=true;document.getElementById('notificationBell').setAttribute('aria-expanded','false')}});
