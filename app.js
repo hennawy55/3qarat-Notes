@@ -191,7 +191,7 @@
     const request=(async()=>{
     const response=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_PUBLISHABLE_KEY,'x-smartnote-session':authToken},body:JSON.stringify({...payload,token:authToken})});
     const raw=await response.text();let result;try{result=JSON.parse(raw)}catch{throw new Error('لم تصل استجابة صالحة من Supabase؛ تحقق من إعداد Edge Function')}
-    if(result.error)throw new Error(result.error);if(result.ok===false)throw new Error('تعذر تنفيذ العملية');return result;
+    if(result.error)throw new Error(result.message||result.error);if(result.ok===false)throw new Error(result.message||'تعذر تنفيذ العملية');return result;
     })();
     if(key)assignmentRequestsInFlight.set(key,request);
     try{return await request}finally{if(key&&assignmentRequestsInFlight.get(key)===request)assignmentRequestsInFlight.delete(key)}
