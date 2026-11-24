@@ -15,7 +15,13 @@ declare
   v_topic text;
   v_session record;
 begin
-  if tg_table_name = 'assignments' then
+  if tg_table_name = 'profiles' then
+    if tg_op = 'DELETE' then
+      v_users := array[old.id];
+    else
+      v_users := array[new.id];
+    end if;
+  elsif tg_table_name = 'assignments' then
     if tg_op = 'DELETE' then
       v_users := array[old.created_by, old.owner_leader_id, old.assignee_id];
     elsif tg_op = 'INSERT' then
@@ -129,4 +135,8 @@ for each row execute function public.smartnote_realtime_broadcast();
 
 drop trigger if exists smartnote_realtime_notifications on public.notifications;
 create trigger smartnote_realtime_notifications after insert or update or delete on public.notifications
+for each row execute function public.smartnote_realtime_broadcast();
+
+drop trigger if exists smartnote_realtime_profiles on public.profiles;
+create trigger smartnote_realtime_profiles after insert or update or delete on public.profiles
 for each row execute function public.smartnote_realtime_broadcast();
