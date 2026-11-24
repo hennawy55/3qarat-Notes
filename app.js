@@ -464,7 +464,7 @@
         realtimeRefreshTimer=setTimeout(async()=>{
           const changed=[...realtimePendingTables];realtimePendingTables.clear();
           if(!isReady||!authToken||!navigator.onLine)return;
-          const notebook=['workspaces','projects','units','notes','clients','tasks','task_notification_dismissals'];
+          const notebook=['user_database_meta'];
           if(changed.some(table=>notebook.includes(table)))await syncCloud();
           if(changed.some(table=>['assignments','assignment_activity','assignment_notes','reassignment_requests'].includes(table))){
             if(currentView==='assigned'||currentView==='dashboard')await loadAssignedView();
