@@ -461,3 +461,22 @@ html[dir="ltr"] .admin-password-row{direction:ltr}
   .notification-panel{position:fixed;top:calc(env(safe-area-inset-top,0px) + 68px);left:10px;right:10px;width:auto;max-height:min(68vh,560px);border-radius:16px}
   .task-alert{padding:12px 13px}
 }
+
+/* Compact notification cards with timestamp and per-item action menu */
+.notification-panel-head{align-items:center}
+.notification-mark-all{white-space:nowrap;flex:none}
+.task-alert{gap:7px;padding:10px 11px}
+.unified-notice-head{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:9px}
+.unified-notice-head .notice-summary{min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:0;font-size:11px;line-height:1.55}
+.notice-time{display:grid;gap:3px;text-align:end;white-space:nowrap;color:var(--muted);font-size:9px;line-height:1.35}
+.notice-entity{font-size:10px;font-weight:700;color:var(--text);padding-inline-start:2px;overflow-wrap:anywhere}
+.notice-menu-wrap{position:relative;display:inline-flex;align-items:center}
+.notice-menu-toggle{width:27px;height:27px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--muted);display:grid;place-items:center;padding:0}
+.notice-menu-toggle svg{width:15px;height:15px}
+.notice-menu{position:absolute;z-index:5;top:calc(100% + 5px);inset-inline-end:0;min-width:130px;padding:5px;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);display:grid;gap:3px}
+.notice-menu[hidden]{display:none}
+.notice-menu button{border:0;background:transparent;color:var(--text);text-align:start;padding:8px 9px;border-radius:7px;font-size:10px}
+.notice-menu button:hover{background:var(--panel2)}
+.notice-menu button.danger{color:var(--red)}
+.task-alert .unread-dot{width:7px;height:7px;border-radius:50%;background:var(--blue);align-self:start}
+@media(max-width:700px){.notification-panel-head{gap:6px}.notification-mark-all{font-size:9px;padding:6px 7px}.unified-notice-head{grid-template-columns:minmax(0,1fr) auto auto;gap:7px}}
