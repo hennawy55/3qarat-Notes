@@ -79,7 +79,9 @@ async function login(u:string,pw:string){
  const token=random(32),expires=new Date(now+DAYS*86400000).toISOString();
  const {error:sessionError}=await db.from("auth_sessions").insert({user_id:a.user_id,token_hash:await hash(token),expires_at:expires});
  if(sessionError){console.error("SESSION CREATE ERROR:",sessionError);return out(500,{ok:false,error:"session_create_failed"});}
- return out(200,{ok:true,token,expiresAt:expires,user:{id:user.id,username:user.username,role:user.role,status:user.status,mustChangePassword:!!user.must_change_password},data:await readNotebook(a.user_id),revision:0});
+ const {data:meta,error:revisionError}=await db.from("user_database_meta").select("revision").eq("user_id",a.user_id).maybeSingle();
+ if(revisionError)return out(500,{ok:false,error:"database_revision_failed"});
+ return out(200,{ok:true,token,expiresAt:expires,user:{id:user.id,username:user.username,role:user.role,status:user.status,mustChangePassword:!!user.must_change_password},data:await readNotebook(a.user_id),revision:Number(meta?.revision||0)});
 }
 
 async function needData<T=any>(q:PromiseLike<any>,code="database_operation_failed"):Promise<T>{const r=await q;if(r.error){console.error(code,r.error);throw new Error(code);}return r.data as T;}
@@ -133,7 +135,7 @@ Deno.serve(async(req:Request)=>{
    return out(201,{ok:true,user:result,notice:"Remove SMARTNOTE_BOOTSTRAP_SECRET from Edge Function secrets after successful bootstrap."});
   }
   const auth=await session(req,typeof b.token==="string"?b.token:"");if(!auth)return out(401,{ok:false,error:"session_invalid"});
-  if(action==="me")return out(200,{ok:true,user:{id:auth.p.id,username:auth.p.username,role:auth.p.role,status:auth.p.status,mustChangePassword:!!auth.p.must_change_password},expiresAt:auth.s.expires_at,data:await readNotebook(auth.p.id)});
+  if(action==="me"){const {data:meta,error:revisionError}=await db.from("user_database_meta").select("revision").eq("user_id",auth.p.id).maybeSingle();if(revisionError)throw new Error("database_revision_failed");return out(200,{ok:true,user:{id:auth.p.id,username:auth.p.username,role:auth.p.role,status:auth.p.status,mustChangePassword:!!auth.p.must_change_password},expiresAt:auth.s.expires_at,data:await readNotebook(auth.p.id),revision:Number(meta?.revision||0)});}
   if(action==="load"){const {data:meta,error}=await db.from("user_database_meta").select("revision").eq("user_id",auth.p.id).maybeSingle();if(error)throw new Error("database_revision_failed");return out(200,{ok:true,data:await readNotebook(auth.p.id),revision:Number(meta?.revision||0)});}
   const assignmentResponse=await assignmentAction(action,b,auth.p);if(assignmentResponse)return out(200,assignmentResponse);const notificationResponse=await notificationAction(action,b,auth.p);if(notificationResponse)return out(200,notificationResponse);
    if(action==="save"){if(!b.data||typeof b.data!=="object"||Array.isArray(b.data))return out(400,{ok:false,error:"invalid_database_payload"});const {data:revision,error}=await db.rpc("replace_smartnote_database",{p_user_id:auth.p.id,p_data:b.data,p_expected_revision:Number.isInteger(Number(b.revision))?Number(b.revision):null});if(error){if(String(error.message||"").includes("data_conflict"))return out(409,{ok:false,error:"data_conflict"});console.error("NOTEBOOK SAVE ERROR:",error);return out(500,{ok:false,error:"database_save_failed"});}return out(200,{ok:true,saved:true,revision:Number(revision||0)});}
