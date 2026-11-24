@@ -434,3 +434,30 @@ html[dir="ltr"] .admin-password-row{direction:ltr}
 
 .notification-load-more{width:calc(100% - 24px);margin:10px 12px 12px;justify-content:center}
 #notificationLoadMore[hidden]{display:none!important}
+
+
+/* Compact, fully clickable notification cards */
+.notification-panel{width:min(390px,calc(100vw - 24px));max-height:min(72vh,560px);padding:10px;overscroll-behavior:contain}
+.notification-panel-head{padding:4px 4px 10px;border-bottom:1px solid var(--line);margin-bottom:8px}
+.notification-panel-list{gap:6px}
+.task-alert{position:relative;display:grid;gap:5px;padding:11px 13px 10px 15px;border:1px solid var(--line);border-radius:12px;background:#fbfafb;cursor:pointer;transition:background .16s ease,border-color .16s ease,transform .16s ease;outline:none}
+.task-alert::before{content:"";position:absolute;inset-block:10px;right:0;width:3px;border-radius:3px;background:transparent}
+.task-alert:hover{background:#f8f0f3;border-color:#d9b7c1;transform:translateY(-1px)}
+.task-alert:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.task-alert.is-unread{background:#fff8fa;border-color:#ead2d9}
+.task-alert.is-unread::before{background:#762236}
+.task-alert.is-read{opacity:.82}
+.unified-notice-head{display:flex;align-items:center;gap:8px;min-width:0}
+.unified-notice-head h3{font-size:12px;line-height:1.55;margin:0;flex:1;min-width:0;overflow-wrap:anywhere}
+.task-alert p{font-size:11px;line-height:1.65;margin:0;color:#68616a;overflow-wrap:anywhere}
+.task-alert small{font-size:10px;color:var(--muted);margin-top:1px}
+.unread-dot{width:7px;height:7px;flex:none;border-radius:50%;background:#a33b4a}
+.notification-empty{padding:24px 12px}
+:root[data-theme="dark"] .task-alert{background:#2b242a;border-color:var(--line)}
+:root[data-theme="dark"] .task-alert.is-unread{background:#38242c;border-color:#704050}
+:root[data-theme="dark"] .task-alert:hover{background:#3a2a32;border-color:#885365}
+:root[data-theme="dark"] .task-alert p{color:#d2c5cc}
+@media(max-width:700px){
+  .notification-panel{position:fixed;top:calc(env(safe-area-inset-top,0px) + 68px);left:10px;right:10px;width:auto;max-height:min(68vh,560px);border-radius:16px}
+  .task-alert{padding:12px 13px}
+}
