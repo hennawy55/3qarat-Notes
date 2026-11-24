@@ -31,7 +31,7 @@ async function session(req:Request,bodyToken=""){
  const {data:s,error:se}=await db.from("auth_sessions").select("id,user_id,expires_at").eq("token_hash",await hash(token)).is("revoked_at",null).gt("expires_at",new Date().toISOString()).maybeSingle();
  if(se){console.error("SESSION LOOKUP ERROR:",se);throw new Error("session_lookup_failed");}
  if(!s)return null;
- const {data:p,error:pe}=await db.from("profiles").select("id,username,role,status,must_change_password").eq("id",s.user_id).maybeSingle();
+ const {data:p,error:pe}=await db.from("profiles").select("id,username,role,status,must_change_password,preferred_language").eq("id",s.user_id).maybeSingle();
  if(pe){console.error("PROFILE LOOKUP ERROR:",pe);throw new Error("profile_lookup_failed");}
  if(!p||p.status!=="active")return null;
  const {error:ue}=await db.from("auth_sessions").update({last_seen_at:new Date().toISOString()}).eq("id",s.id);
@@ -71,7 +71,7 @@ async function login(u:string,pw:string){
   const locked=!!rateData[0].locked_until&&Date.parse(rateData[0].locked_until)>Date.now();
   return out(locked?429:401,{ok:false,error:locked?"too_many_attempts":"invalid_credentials"});
  }
- const {data:user,error:profileError}=await db.from("profiles").select("id,username,role,status,must_change_password").eq("id",a.user_id).maybeSingle();
+ const {data:user,error:profileError}=await db.from("profiles").select("id,username,role,status,must_change_password,preferred_language").eq("id",a.user_id).maybeSingle();
  if(profileError){console.error("LOGIN PROFILE LOOKUP ERROR:",profileError);return out(500,{ok:false,error:"login_unavailable"});}
  if(!user||user.status!=="active")return out(403,{ok:false,error:"inactive_user"});
  const {error:clearError}=await db.from("auth_login_attempts").delete().eq("username_key",key);
@@ -81,7 +81,7 @@ async function login(u:string,pw:string){
  if(sessionError){console.error("SESSION CREATE ERROR:",sessionError);return out(500,{ok:false,error:"session_create_failed"});}
  const {data:meta,error:revisionError}=await db.from("user_database_meta").select("revision").eq("user_id",a.user_id).maybeSingle();
  if(revisionError)return out(500,{ok:false,error:"database_revision_failed"});
- return out(200,{ok:true,token,expiresAt:expires,user:{id:user.id,username:user.username,role:user.role,status:user.status,mustChangePassword:!!user.must_change_password},data:await readNotebook(a.user_id),revision:Number(meta?.revision||0)});
+ return out(200,{ok:true,token,expiresAt:expires,user:{id:user.id,username:user.username,role:user.role,status:user.status,mustChangePassword:!!user.must_change_password,preferredLanguage:user.preferred_language||"en"},data:await readNotebook(a.user_id),revision:Number(meta?.revision||0)});
 }
 
 async function needData<T=any>(q:PromiseLike<any>,code="database_operation_failed"):Promise<T>{const r=await q;if(r.error){console.error(code,r.error);throw new Error(code);}return r.data as T;}
@@ -123,7 +123,27 @@ async function sendPush(userId:string,assignmentId:string,title:string,body:stri
  }));
  return {sent:results.filter(Boolean).length,failed:results.filter(x=>!x).length};
 }
-async function notify(userId:string,assignmentId:string,type:string,title:string,body:string){if(userId){await needData(db.from("notifications").insert({user_id:userId,assignment_id:assignmentId||null,type,title,body}),"notification_write_failed");await sendPush(userId,assignmentId,title,body);}}
+function localizedNotification(type:string,title:string,body:string,language:string){
+ if(language!=="en")return {title,body};
+ const titleMap:Record<string,string>={assigned:"New follow-up",completed:"Follow-up completed",reassigned:"Follow-up reassigned",reassignment_request:"Reassignment request",reassignment_result:"Reassignment request update"};
+ let nextBody=body;
+ if(type==="assigned")nextBody=body.replace(" — تم إسناد متابعة إليك"," — A follow-up has been assigned to you");
+ else if(type==="completed")nextBody=body.replace(" — تم إغلاقها"," — This follow-up has been closed");
+ else if(type==="reassigned")nextBody=body.replace(" — تم إسنادها إلى "," — It has been reassigned to ");
+ else if(type==="reassignment_result"){
+  if(body==="تم تغيير المسؤول قبل مراجعة الطلب.")nextBody="The assignee changed before the request was reviewed.";
+  else if(body.includes("تمت الموافقة"))nextBody=body.replace("تمت الموافقة على نقل المتابعة","The follow-up reassignment was approved");
+  else if(body.includes("تم رفض"))nextBody=body.replace("تم رفض نقل المتابعة","The follow-up reassignment was rejected");
+ }
+ return {title:titleMap[type]||title,body:nextBody};
+}
+async function notify(userId:string,assignmentId:string,type:string,title:string,body:string){
+ if(!userId)return;
+ const profile=await needData<any>(db.from("profiles").select("preferred_language").eq("id",userId).maybeSingle(),"notification_language_lookup_failed");
+ const message=localizedNotification(type,title,body,profile?.preferred_language||"en");
+ await needData(db.from("notifications").insert({user_id:userId,assignment_id:assignmentId||null,type,title:message.title,body:message.body}),"notification_write_failed");
+ await sendPush(userId,assignmentId,message.title,message.body);
+}
 async function getAssignment(id:string){return await needData<any>(db.from("assignments").select("*").eq("id",id).maybeSingle(),"assignment_lookup_failed");}
 function assignmentDto(a:any){const type=String(a.assignment_type||"task"),clientName=String(a.client_name||"");let title=String(a.title||"");if(type==="client")title=clientName||title.replace(/^متابعة عميل\s*:\s*/,"");return {id:String(a.id),title,description:String(a.description||""),type,clientName,clientPhone:String(a.client_phone||""),status:String(a.status||"new"),priority:String(a.priority||"normal"),dueAt:String(a.due_at||""),createdAt:String(a.created_at||""),assignedAt:String(a.assigned_at||""),updatedAt:String(a.updated_at||""),createdBy:String(a.created_by||""),createdByName:String(a.created_by_name||""),ownerLeaderId:String(a.owner_leader_id||""),ownerLeaderName:String(a.owner_leader_name||""),assigneeId:String(a.assignee_id||""),assigneeName:String(a.assignee_name||""),archivedAt:String(a.archived_at||""),viewedAt:String(a.viewed_at||"")};}
 function canManageAssignment(u:any,a:any){return u.role==="admin"||a.owner_leader_id===u.id;}
@@ -149,6 +169,7 @@ async function assignmentAction(action:string,b:any,u:any){
  return null;
 }
 async function notificationAction(action:string,b:any,u:any){
+ if(action==="profile_language_set"){const language=b.language==="ar"?"ar":b.language==="en"?"en":"";if(!language)return out(400,{ok:false,error:"invalid_language"});const {error}=await db.from("profiles").update({preferred_language:language}).eq("id",u.id);if(error)throw new Error("profile_language_update_failed");return {ok:true,language};}
  if(action==="push_register"){
   const token=typeof b.fcmToken==="string"?b.fcmToken.trim():"";
   if(token.length<40||token.length>4096)return out(400,{ok:false,error:"invalid_push_token",stage:"validate_token"});
@@ -186,7 +207,7 @@ Deno.serve(async(req:Request)=>{
    return out(201,{ok:true,user:result,notice:"Remove SMARTNOTE_BOOTSTRAP_SECRET from Edge Function secrets after successful bootstrap."});
   }
   const auth=await session(req,typeof b.token==="string"?b.token:"");if(!auth)return out(401,{ok:false,error:"session_invalid"});
-  if(action==="me"){const {data:meta,error:revisionError}=await db.from("user_database_meta").select("revision").eq("user_id",auth.p.id).maybeSingle();if(revisionError)throw new Error("database_revision_failed");return out(200,{ok:true,user:{id:auth.p.id,username:auth.p.username,role:auth.p.role,status:auth.p.status,mustChangePassword:!!auth.p.must_change_password},expiresAt:auth.s.expires_at,data:await readNotebook(auth.p.id),revision:Number(meta?.revision||0)});}
+  if(action==="me"){const {data:meta,error:revisionError}=await db.from("user_database_meta").select("revision").eq("user_id",auth.p.id).maybeSingle();if(revisionError)throw new Error("database_revision_failed");return out(200,{ok:true,user:{id:auth.p.id,username:auth.p.username,role:auth.p.role,status:auth.p.status,mustChangePassword:!!auth.p.must_change_password,preferredLanguage:auth.p.preferred_language||"en"},expiresAt:auth.s.expires_at,data:await readNotebook(auth.p.id),revision:Number(meta?.revision||0)});}
   if(action==="load"){const {data:meta,error}=await db.from("user_database_meta").select("revision").eq("user_id",auth.p.id).maybeSingle();if(error)throw new Error("database_revision_failed");return out(200,{ok:true,data:await readNotebook(auth.p.id),revision:Number(meta?.revision||0)});}
   const assignmentResponse=await assignmentAction(action,b,auth.p);if(assignmentResponse)return out(200,assignmentResponse);const notificationResponse=await notificationAction(action,b,auth.p);if(notificationResponse)return out(200,notificationResponse);
    if(action==="save"){if(!b.data||typeof b.data!=="object"||Array.isArray(b.data))return out(400,{ok:false,error:"invalid_database_payload"});const {data:revision,error}=await db.rpc("replace_smartnote_database",{p_user_id:auth.p.id,p_data:b.data,p_expected_revision:Number.isInteger(Number(b.revision))?Number(b.revision):null});if(error){if(String(error.message||"").includes("data_conflict"))return out(409,{ok:false,error:"data_conflict"});console.error("NOTEBOOK SAVE ERROR:",error);return out(500,{ok:false,error:"database_save_failed"});}return out(200,{ok:true,saved:true,revision:Number(revision||0)});}
