@@ -451,7 +451,7 @@
     renderUnifiedNotifications();
   }
   async function handleUnifiedNotificationClick(e){
-    const menu=e.target.closest('[data-notice-menu]');if(menu){e.stopPropagation();const wrap=menu.closest('.notice-menu-wrap'),panel=wrap.querySelector('.notice-menu'),open=panel.hidden;document.querySelectorAll('.notice-menu').forEach(x=>x.hidden=true);document.querySelectorAll('.notice-menu-toggle').forEach(x=>x.setAttribute('aria-expanded','false'));panel.hidden=!open;menu.setAttribute('aria-expanded',String(open));return}
+    const menu=e.target.closest('[data-notice-menu]');if(menu){e.stopPropagation();const wrap=menu.closest('.notice-menu-wrap'),panel=wrap.querySelector('.notice-menu'),open=panel.hidden;document.querySelectorAll('.notice-menu').forEach(x=>{x.hidden=true;x.style.top='';x.style.left='';x.style.right=''});document.querySelectorAll('.notice-menu-toggle').forEach(x=>x.setAttribute('aria-expanded','false'));if(open){const rect=menu.getBoundingClientRect(),width=Math.min(180,window.innerWidth-24),height=86;let left=Math.max(12,Math.min(rect.right-width,window.innerWidth-width-12)),top=rect.bottom+6;if(top+height>window.innerHeight-12)top=Math.max(12,rect.top-height-6);panel.style.position='fixed';panel.style.width=width+'px';panel.style.left=left+'px';panel.style.right='auto';panel.style.top=top+'px';panel.hidden=false;menu.setAttribute('aria-expanded','true')}return}
     const read=e.target.closest('[data-notice-read]');if(read){e.stopPropagation();try{await setUnifiedNotificationRead(read.dataset.noticeRead)}catch(err){toast(err.message)}return}
     const del=e.target.closest('[data-notice-delete]');if(del){e.stopPropagation();try{await deleteUnifiedNotification(del.dataset.noticeDelete)}catch(err){toast(err.message)}return}
     const card=e.target.closest('[data-unified-open]');if(!card)return;
@@ -543,6 +543,9 @@
   document.getElementById('retryConnection').onclick=initializeCloud;
   document.getElementById('notificationBell').onclick=async()=>{const panel=document.getElementById('notificationPanel'),open=panel.hidden;panel.hidden=!open;document.getElementById('notificationBell').setAttribute('aria-expanded',String(open));if(open)await refreshUnifiedNotifications()};
   document.getElementById('taskAlerts').addEventListener('click',handleUnifiedNotificationClick);
+  document.addEventListener('click',event=>{if(event.target.closest('#taskAlerts'))return;document.querySelectorAll('.notice-menu').forEach(x=>{x.hidden=true;x.style.top='';x.style.left='';x.style.right=''});document.querySelectorAll('.notice-menu-toggle').forEach(x=>x.setAttribute('aria-expanded','false'))});
+  window.addEventListener('resize',()=>{document.querySelectorAll('.notice-menu').forEach(x=>{x.hidden=true;x.style.top='';x.style.left='';x.style.right=''});document.querySelectorAll('.notice-menu-toggle').forEach(x=>x.setAttribute('aria-expanded','false'))});
+  document.getElementById('taskAlerts').addEventListener('scroll',()=>{document.querySelectorAll('.notice-menu').forEach(x=>{x.hidden=true;x.style.top='';x.style.left='';x.style.right=''});document.querySelectorAll('.notice-menu-toggle').forEach(x=>x.setAttribute('aria-expanded','false'))},true);
   document.getElementById('notificationMarkAll')?.addEventListener('click',markAllUnifiedNotificationsRead);
   document.getElementById('notificationLoadMore')?.addEventListener('click',async event=>{const button=event.currentTarget;if(button.disabled||!serverNotificationHasMore)return;button.disabled=true;button.textContent=assignmentText('جارٍ التحميل...','Loading...');await refreshUnifiedNotifications(true)});
   // Alert action handlers are attached directly in renderTaskAlerts for reliable Android WebView taps.
