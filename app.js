@@ -443,7 +443,9 @@
         realtimeClient=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{autoRefreshToken:false,persistSession:false},realtime:{params:{eventsPerSecond:10}}});
       }
       if(realtimeChannel){try{await realtimeClient.removeChannel(realtimeChannel)}catch{}realtimeChannel=null}
-      realtimeChannel=realtimeClient.channel('smartnote-user:'+currentUser.id,{config:{broadcast:{self:false}}});
+      const tokenDigest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(authToken));
+      const tokenTopic=Array.from(new Uint8Array(tokenDigest),byte=>byte.toString(16).padStart(2,'0')).join('');
+      realtimeChannel=realtimeClient.channel('smartnote-session:'+tokenTopic,{config:{private:false,broadcast:{self:false}}});
       realtimeChannel.on('broadcast',{event:'refresh'},({payload})=>{
         if(payload?.table)realtimePendingTables.add(String(payload.table));
         clearTimeout(realtimeRefreshTimer);
