@@ -473,7 +473,7 @@ html[dir="ltr"] .admin-password-row{direction:ltr}
 .notice-menu-wrap{position:relative;display:inline-flex;align-items:center}
 .notice-menu-toggle{width:27px;height:27px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--muted);display:grid;place-items:center;padding:0}
 .notice-menu-toggle svg{width:15px;height:15px}
-.notice-menu{position:absolute;z-index:5;top:calc(100% + 5px);inset-inline-end:0;min-width:130px;padding:5px;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);display:grid;gap:3px}
+.notice-menu{position:fixed;z-index:9999;min-width:130px;max-width:calc(100vw - 24px);padding:5px;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 36px #21151b35;display:grid;gap:3px;isolation:isolate}
 .notice-menu[hidden]{display:none}
 .notice-menu button{border:0;background:transparent;color:var(--text);text-align:start;padding:8px 9px;border-radius:7px;font-size:10px}
 .notice-menu button:hover{background:var(--panel2)}
