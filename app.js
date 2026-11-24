@@ -13,6 +13,7 @@
   const emptyDB=()=>({version:1,workspaces:[],projects:[],units:[],notes:[],clients:[],tasks:[]});
   let db=emptyDB(), editing=null, isReady=false, saveQueue=Promise.resolve(), syncInFlight=false, writesInProgress=0, localRevision=0, cloudRevision=0;
   let assignedItems=[],assignedArchivedItems=[],assignmentPeople=[],serverNotifications=[],serverNotificationCursor='',serverNotificationHasMore=false,serverNotificationUnreadCount=0,serverNotificationTotalCount=0;
+  let realtimeClient=null,realtimeChannel=null,realtimeRefreshTimer=0;const realtimePendingTables=new Set();
   const localDataKey=()=>`smartnote-local-db-v1:${encodeURIComponent(currentUser?.username||'')}`;
   const pendingSyncKey=()=>`smartnote-pending-sync-v1:${encodeURIComponent(currentUser?.username||'')}`;
   const cloudRevisionKey=()=>`smartnote-supabase-cloud-revision-v1:${encodeURIComponent(currentUser?.username||'')}`;
@@ -262,8 +263,9 @@
     ['assignedSearch','assignedAssigneeFilter','assignedPriorityFilter','assignedDateFrom','assignedDateTo'].forEach(id=>document.getElementById(id)?.addEventListener(id==='assignedSearch'?'input':'change',renderAssignedView));
     const av=document.getElementById('view-assigned');if(av&&!av.dataset.bound){av.dataset.bound='1';av.addEventListener('click',async e=>{const o=e.target.closest('[data-assignment-open]'),s=e.target.closest('[data-assignment-save]');if(o)await openAssignedDetail(o.dataset.assignmentOpen);if(s){const id=s.dataset.assignmentSave,sel=av.querySelector('[data-assignment-status="'+CSS.escape(id)+'"]');try{await apiPost({action:'assignment_status',assignmentId:id,status:sel.value});toast(assignmentText('تم تحديث الحالة','Status updated'));await loadAssignedView()}catch(err){toast(err.message)}}})}
     refreshUnifiedNotifications();
+    startRealtimeSync();
     // Assignment navigation is integrated into the primary navigation.
-    if(!document.getElementById('logoutButton')){const b=document.createElement('button');b.id='logoutButton';b.className='btn small';b.textContent=window.appTranslate?.('تسجيل الخروج')||(document.documentElement.lang==='en'?'Sign out':'تسجيل الخروج');b.onclick=async()=>{try{await apiPost({action:'logout'})}catch(_){}authToken='';currentUser=null;isReady=false;localStorage.removeItem(SESSION_KEY);showLogin('تم تسجيل الخروج.');document.getElementById('adminUsersButton')?.remove();b.remove()};document.querySelector('.top-actions').prepend(b)}
+    if(!document.getElementById('logoutButton')){const b=document.createElement('button');b.id='logoutButton';b.className='btn small';b.textContent=window.appTranslate?.('تسجيل الخروج')||(document.documentElement.lang==='en'?'Sign out':'تسجيل الخروج');b.onclick=async()=>{try{await apiPost({action:'logout'})}catch(_){}stopRealtimeSync();authToken='';currentUser=null;isReady=false;localStorage.removeItem(SESSION_KEY);showLogin('تم تسجيل الخروج.');document.getElementById('adminUsersButton')?.remove();b.remove()};document.querySelector('.top-actions').prepend(b)}
 
   }
   window.addEventListener('app-language-change',()=>{const button=document.getElementById('logoutButton');if(button)button.textContent=window.appTranslate?.('تسجيل الخروج')||(document.documentElement.lang==='en'?'Sign out':'تسجيل الخروج');const w=document.getElementById('welcomeUser');if(w&&currentUser)w.textContent=(document.documentElement.lang==='en'?'Welcome, ':'مرحباً، ')+currentUser.username;if(currentView==='assigned')loadAssignedView();refreshUnifiedNotifications()});
@@ -400,12 +402,24 @@
       popup.querySelector('#assignedNoteForm').onsubmit=async e=>{e.preventDefault();const f=e.currentTarget;try{await apiPost({action:'assignment_note_add',assignmentId:id,body:f.body.value,visibility:f.visibility.value});await openAssignedDetail(id)}catch(err){toast(err.message)}};
     }catch(err){toast(t('تعذر فتح تفاصيل المتابعة: ','Could not open follow-up details: ')+err.message)}
   }
-  async function refreshUnifiedNotifications(loadOlder=false){
-    const t=assignmentText;
+  async function announceServerNotification(notification){
+    if(!notification||notification.isRead)return;
+    const options={id:notification.id,title:notification.title||assignmentText('إشعار جديد','New notification'),body:notification.body||'',assignmentId:notification.assignmentId||'',notificationId:notification.id};
+    try{
+      if(window.smartNoteNativeNotifications?.isNative&&window.smartNoteNativeNotifications.showInstantNotification){await window.smartNoteNativeNotifications.showInstantNotification(options);return}
+      if('Notification'in window&&Notification.permission==='granted'&&'serviceWorker'in navigator){
+        if(!serviceWorkerRegistration)serviceWorkerRegistration=await navigator.serviceWorker.ready;
+        await serviceWorkerRegistration?.showNotification(options.title,{body:options.body,tag:'smartnote-server:'+options.id,data:{assignmentId:options.assignmentId,notificationId:options.notificationId}});
+      }
+    }catch(error){console.warn('Could not display system notification:',error)}
+  }
+  async function refreshUnifiedNotifications(loadOlder=false,announceNew=false){
+    const t=assignmentText,previousIds=new Set(serverNotifications.map(item=>item.id));
     try{
       const result=await apiPost({action:'notification_list',cursor:loadOlder?serverNotificationCursor:''});
       serverNotifications=loadOlder?serverNotifications.concat(result.notifications||[]):(result.notifications||[]);
       serverNotificationCursor=result.nextCursor||'';serverNotificationHasMore=!!result.hasMore;if(!loadOlder){serverNotificationUnreadCount=Number(result.unreadCount||0);serverNotificationTotalCount=Number(result.totalCount||0);}
+      if(announceNew&&!loadOlder){const fresh=serverNotifications.filter(item=>!previousIds.has(item.id)&&!item.isRead).reverse();for(const item of fresh)await announceServerNotification(item)}
     }catch(error){if(!loadOlder)serverNotifications=[];toast(t('تعذر تحميل الإشعارات: ','Could not load notifications: ')+error.message)}
     renderUnifiedNotifications();
   }
@@ -414,21 +428,60 @@
     const unread=taskAlerts.filter(n=>!n.isRead).length+serverNotificationUnreadCount,list=document.getElementById('taskAlerts'),more=document.getElementById('notificationLoadMore');
     document.getElementById('notificationCount').textContent=unread;document.getElementById('notificationCount').hidden=!unread;document.getElementById('notificationPanelCount').textContent='('+(taskAlerts.length+serverNotificationTotalCount)+')';document.getElementById('notificationBell').setAttribute('aria-label',t('الإشعارات: ','Notifications: ')+unread);
     if(more){more.hidden=!serverNotificationHasMore;more.disabled=false;more.textContent=t('تحميل إشعارات أقدم','Load older notifications')}
-    list.innerHTML=all.length?all.map(n=>'<article class="task-alert '+(n.isRead?'is-read':'is-unread')+'"><div class="unified-notice-head"><h3>'+esc(n.title)+'</h3>'+(n.isRead?'':'<span class="unread-dot"></span>')+'</div><p>'+esc(n.body)+'</p><small>'+assignmentDate(n.createdAt)+'</small><div class="task-alert-actions"><button class="btn primary" data-unified-open="'+esc(n.id)+'" data-kind="'+n.kind+'" data-assignment="'+esc(n.assignmentId||'')+'" data-task="'+esc(n.taskId||'')+'">'+t('عرض','Open')+'</button></div></article>').join(''):'<div class="notification-empty">'+t('لا توجد إشعارات حالياً','No notifications yet')+'</div>';
+    list.innerHTML=all.length?all.map(n=>'<article class="task-alert '+(n.isRead?'is-read':'is-unread')+'" role="button" tabindex="0" data-unified-open="'+esc(n.id)+'" data-kind="'+n.kind+'" data-assignment="'+esc(n.assignmentId||'')+'" data-task="'+esc(n.taskId||'')+'" aria-label="'+esc(t('فتح الإشعار: ','Open notification: ')+n.title)+'"><div class="unified-notice-head"><h3>'+esc(n.title)+'</h3>'+(n.isRead?'':'<span class="unread-dot" aria-label="'+t('غير مقروء','Unread')+'"></span>')+'</div><p>'+esc(n.body)+'</p><small>'+assignmentDate(n.createdAt)+'</small></article>').join(''):'<div class="notification-empty">'+t('لا توجد إشعارات حالياً','No notifications yet')+'</div>';
   }
   async function handleUnifiedNotificationClick(e){
-    const b=e.target.closest('[data-unified-open]');if(!b)return;
+    const card=e.target.closest('[data-unified-open]');if(!card)return;
     try{
-      if(b.dataset.kind==='local'){
-        const alert=taskAlerts.find(x=>x.key===b.dataset.unifiedOpen.replace('local:',''));
-        if(alert){alert.isRead=true;closeBrowserNotification(alert.key);persistTaskAlertState();showView('tasks');openForm('task',alert.taskId)}
+      if(card.dataset.kind==='local'){
+        const alert=taskAlerts.find(x=>x.key===card.dataset.unifiedOpen.replace('local:',''));
+        if(alert){alert.isRead=true;closeBrowserNotification(alert.key);persistTaskAlertState();document.getElementById('notificationPanel').hidden=true;showView('tasks');openForm('task',alert.taskId)}
       }else{
-        await apiPost({action:'notification_read',notificationId:b.dataset.unifiedOpen});
-        const item=serverNotifications.find(x=>x.id===b.dataset.unifiedOpen);if(item&&!item.isRead){item.isRead=true;serverNotificationUnreadCount=Math.max(0,serverNotificationUnreadCount-1);}
-        if(b.dataset.assignment){showView('assigned');await openAssignedDetail(b.dataset.assignment)}
+        const item=serverNotifications.find(x=>x.id===card.dataset.unifiedOpen);
+        if(item&&!item.isRead){await apiPost({action:'notification_read',notificationId:card.dataset.unifiedOpen});item.isRead=true;serverNotificationUnreadCount=Math.max(0,serverNotificationUnreadCount-1);}
+        document.getElementById('notificationPanel').hidden=true;
+        if(card.dataset.assignment){showView('assigned');await openAssignedDetail(card.dataset.assignment)}
       }
+      document.getElementById('notificationBell').setAttribute('aria-expanded','false');
       renderUnifiedNotifications();
     }catch(err){toast(err.message)}
+  }
+  document.getElementById('taskAlerts').addEventListener('keydown',event=>{if((event.key==='Enter'||event.key===' ')&&event.target.closest('[data-unified-open]')){event.preventDefault();handleUnifiedNotificationClick(event)}});
+  async function startRealtimeSync(){
+    if(!isReady||!currentUser?.id||!navigator.onLine)return;
+    try{
+      if(!realtimeClient){
+        const {createClient}=await import('https://esm.sh/@supabase/supabase-js@2');
+        realtimeClient=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{autoRefreshToken:false,persistSession:false},realtime:{params:{eventsPerSecond:10}}});
+      }
+      if(realtimeChannel){try{await realtimeClient.removeChannel(realtimeChannel)}catch{}realtimeChannel=null}
+      const tokenDigest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(authToken));
+      const tokenTopic=Array.from(new Uint8Array(tokenDigest),byte=>byte.toString(16).padStart(2,'0')).join('');
+      realtimeChannel=realtimeClient.channel('smartnote-session:'+tokenTopic,{config:{private:false,broadcast:{self:false}}});
+      realtimeChannel.on('broadcast',{event:'refresh'},({payload})=>{
+        if(payload?.table)realtimePendingTables.add(String(payload.table));
+        clearTimeout(realtimeRefreshTimer);
+        realtimeRefreshTimer=setTimeout(async()=>{
+          const changed=[...realtimePendingTables];realtimePendingTables.clear();
+          if(!isReady||!authToken||!navigator.onLine)return;
+          const notebook=['user_database_meta'];
+          if(changed.some(table=>notebook.includes(table)))await syncCloud();
+          if(changed.some(table=>['assignments','assignment_activity','assignment_notes','reassignment_requests'].includes(table))){
+            if(currentView==='assigned'||currentView==='dashboard')await loadAssignedView();
+            if(document.querySelector('.assignment-popup'))toast(assignmentText('تم تحديث بيانات المتابعة من مستخدم آخر','Follow-up updated by another user'));
+          }
+          if(changed.includes('notifications'))await refreshUnifiedNotifications(false,true);else if(changed.some(table=>['assignments','reassignment_requests'].includes(table)))await refreshUnifiedNotifications();
+          if(changed.includes('profiles')&&currentUser?.role==='admin'&&document.getElementById('adminPanel')?.style.display==='flex')await openAdminPanel();
+        },220);
+      }).subscribe(status=>{
+        if(status==='SUBSCRIBED')setConnection(true,assignmentText('المزامنة اللحظية مفعّلة','Live synchronization is active'));
+        else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')console.warn('SmartNote Realtime status:',status);
+      });
+    }catch(error){console.warn('Realtime unavailable; periodic sync remains active:',error);if(realtimeChannel&&realtimeClient){try{await realtimeClient.removeChannel(realtimeChannel)}catch{}realtimeChannel=null}}
+  }
+  function stopRealtimeSync(){
+    clearTimeout(realtimeRefreshTimer);realtimePendingTables.clear();
+    if(realtimeClient&&realtimeChannel){realtimeClient.removeChannel(realtimeChannel).catch(()=>{});realtimeChannel=null}
   }
   async function initializeCloud(){
     const saved=localStorage.getItem(SESSION_KEY);
@@ -470,7 +523,11 @@
   document.getElementById('notificationLoadMore')?.addEventListener('click',async event=>{const button=event.currentTarget;if(button.disabled||!serverNotificationHasMore)return;button.disabled=true;button.textContent=assignmentText('جارٍ التحميل...','Loading...');await refreshUnifiedNotifications(true)});
   // Alert action handlers are attached directly in renderTaskAlerts for reliable Android WebView taps.
   document.addEventListener('click',event=>{if(!event.target.closest('.notification-center')){document.getElementById('notificationPanel').hidden=true;document.getElementById('notificationBell').setAttribute('aria-expanded','false')}});
-  navigator.serviceWorker?.addEventListener('message',event=>{if(event.data?.type==='OPEN_TASK_NOTIFICATION'&&typeof event.data.taskId==='string'){const alert=taskAlerts.find(x=>x.key===event.data.key);if(alert){alert.isRead=true;persistTaskAlertState();renderTaskAlerts()}showView('tasks');if(get('tasks',event.data.taskId))openForm('task',event.data.taskId)}});
+  navigator.serviceWorker?.addEventListener('message',event=>{
+    if(event.data?.type==='OPEN_TASK_NOTIFICATION'&&typeof event.data.taskId==='string'){const alert=taskAlerts.find(x=>x.key===event.data.key);if(alert){alert.isRead=true;persistTaskAlertState();renderTaskAlerts()}showView('tasks');if(get('tasks',event.data.taskId))openForm('task',event.data.taskId)}
+    if(event.data?.type==='OPEN_ASSIGNED_NOTIFICATION'&&typeof event.data.assignmentId==='string'){showView('assigned');openAssignedDetail(event.data.assignmentId)}
+  });
+  window.addEventListener('smartnote-open-assignment',event=>{const id=event.detail?.assignmentId;if(id){showView('assigned');openAssignedDetail(id)}});
   window.addEventListener('smartnote-open-task',event=>{const taskId=event.detail?.taskId;if(typeof taskId==='string'){const alert=taskAlerts.find(x=>x.key===event.detail?.key);if(alert){alert.isRead=true;persistTaskAlertState();renderTaskAlerts()}showView('tasks');if(get('tasks',taskId))openForm('task',taskId)}});
   function handleAppBack(){
     const modal=document.querySelector('.modal-backdrop.show');if(modal){modal.classList.remove('show');editing=null;return}
@@ -483,9 +540,9 @@
   window.addEventListener('keydown',event=>{if(event.key==='Escape'){handleAppBack()}});
   document.addEventListener('pointerdown',unlockNotificationAudio,{once:true});
   document.addEventListener('keydown',unlockNotificationAudio,{once:true});
-  window.addEventListener('online',()=>{if(isReady&&authToken)syncCloud();else initializeCloud()});
+  window.addEventListener('online',()=>{if(isReady&&authToken){syncCloud();startRealtimeSync()}else initializeCloud()});
   window.addEventListener('offline',()=>{setConnection(false,'انقطع اتصال الإنترنت. ستتم إعادة المزامنة تلقائياً عند عودة الاتصال.')});
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden){syncCloud();checkTaskNotifications()}});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden){syncCloud();startRealtimeSync();refreshUnifiedNotifications();checkTaskNotifications()}});
   let lastVisibleSyncAt=0;
   setInterval(()=>{if(!document.hidden&&Date.now()-lastVisibleSyncAt>=30000){lastVisibleSyncAt=Date.now();syncCloud()}},5000);
   setInterval(checkTaskNotifications,15000);

@@ -1,4 +1,4 @@
-const CACHE = 'smartnote-offline-shell-v27';
+const CACHE = 'smartnote-offline-shell-v28';
 const ASSETS = [
   './index.html',
   './styles.css',
@@ -70,15 +70,19 @@ self.addEventListener('fetch', event => {
 
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  const taskId = event.notification.data && event.notification.data.taskId;
-  const alertKey = event.notification.data && event.notification.data.key;
-  if (!taskId) return;
+  const data = event.notification.data || {};
+  const taskId = data.taskId;
+  const assignmentId = data.assignmentId;
+  const alertKey = data.key;
+  if (!taskId && !assignmentId) return;
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     for (const client of windows) {
-      client.postMessage({ type: 'OPEN_TASK_NOTIFICATION', taskId, key: alertKey });
+      if (assignmentId) client.postMessage({ type: 'OPEN_ASSIGNED_NOTIFICATION', assignmentId, notificationId: data.notificationId });
+      else client.postMessage({ type: 'OPEN_TASK_NOTIFICATION', taskId, key: alertKey });
       if ('focus' in client) return client.focus();
     }
-    return self.clients.openWindow(`./?openTask=${encodeURIComponent(taskId)}`);
+    const target = taskId ? `./?openTask=${encodeURIComponent(taskId)}` : './';
+    return self.clients.openWindow(target);
   })());
 });
