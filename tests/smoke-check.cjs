@@ -5,7 +5,7 @@ const read = name => fs.readFileSync(name, 'utf8');
 const app = read('app.js');
 const edge = read('supabase/functions/smartnote-auth/index.ts');
 const migrationAuth = read('supabase/migrations/202611240003_custom_auth.sql');
-const migrationDb = read('supabase/migrations/202611240006_atomic_user_database.sql');
+const migrationDb = read('supabase/migrations/202611240007_atomic_database_revision.sql');
 const html = read('index.html');
 const worker = read('sw.js');
 const packageJson = JSON.parse(read('package.json'));
