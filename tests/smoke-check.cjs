@@ -12,7 +12,7 @@ const packageJson = JSON.parse(read('package.json'));
 const manifest = JSON.parse(read('manifest.json'));
 const supabaseConfig = read('supabase/config.toml');
 
-assert(app.includes("https://cantyrqkkbqwrajghluw.supabase.co/functions/v1/smartnote-auth"), 'Client must target Supabase Edge Function');
+assert(app.includes("SUPABASE_URL='https://cantyrqkkbqwrajghluw.supabase.co'") && app.includes("'/functions/v1/smartnote-auth'"), 'Client must target Supabase Edge Function');
 assert(app.includes("'apikey'") && app.includes("'x-smartnote-session'"), 'Client must send publishable key and custom session headers');
 assert(!app.includes('script.google.com/macros'), 'Google Apps Script must no longer be the active API');
 assert(app.includes("action:'assignment_history'") && app.includes("action:'assignment_targets'") && app.includes("action:'reassignment_targets'"), 'Assigned follow-up UI actions must remain wired');
