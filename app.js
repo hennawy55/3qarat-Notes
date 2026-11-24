@@ -421,7 +421,6 @@
   function notificationEntityLabel(n){
     if(n.kind==='local'){
       const task=get('tasks',n.taskId);if(!task)return assignmentText('متابعة','Task')+': '+(n.taskTitle||n.body||'');
-      for(const [field,type] of [['clientId','clients'],['projectId','projects'],['unitId','units']]){const item=task[field]&&get(type,task[field]);if(item)return assignmentText(type==='clients'?'عميل':type==='projects'?'مشروع':'وحدة',type==='clients'?'Client':type==='projects'?'Project':'Unit')+': '+(item.name||item.title||'')}
       return assignmentText('متابعة','Task')+': '+(task.title||'');
     }
     const labels={assigned:['متابعة','Follow-up'],reassigned:['متابعة','Follow-up'],reassignment_request:['طلب نقل','Transfer request'],reassignment_result:['طلب نقل','Transfer request'],assignment_completed:['متابعة','Follow-up'],note_added:['ملاحظة','Note']};
@@ -448,7 +447,7 @@
   }
   async function deleteUnifiedNotification(id){
     if(id.startsWith('local:')){removeTaskAlert(id.slice(6))}
-    else{await apiPost({action:'notification_delete',notificationId:id});serverNotifications=serverNotifications.filter(x=>x.id!==id);serverNotificationTotalCount=Math.max(0,serverNotificationTotalCount-1);const itemWasUnread=serverNotifications.find(x=>x.id===id);if(itemWasUnread&&!itemWasUnread.isRead)serverNotificationUnreadCount=Math.max(0,serverNotificationUnreadCount-1)}
+    else{const existing=serverNotifications.find(x=>x.id===id);await apiPost({action:'notification_delete',notificationId:id});serverNotifications=serverNotifications.filter(x=>x.id!==id);serverNotificationTotalCount=Math.max(0,serverNotificationTotalCount-1);if(existing&&!existing.isRead)serverNotificationUnreadCount=Math.max(0,serverNotificationUnreadCount-1)}
     renderUnifiedNotifications();
   }
   async function handleUnifiedNotificationClick(e){
