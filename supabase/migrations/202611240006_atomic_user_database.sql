@@ -13,7 +13,7 @@ returns bigint
 language plpgsql
 security definer
 set search_path = public
-as $
+as $$
 declare
   current_revision bigint;
 begin
@@ -75,7 +75,7 @@ begin
   update public.user_database_meta set revision=current_revision+1,updated_at=now() where user_id=p_user_id;
   return current_revision+1;
 end;
-$;
+$$;
 
 revoke all on function public.replace_smartnote_database(uuid,jsonb,bigint) from public, anon, authenticated;
 grant execute on function public.replace_smartnote_database(uuid,jsonb,bigint) to service_role;
