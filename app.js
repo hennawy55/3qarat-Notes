@@ -266,17 +266,38 @@
     if(!authToken||!window.smartNoteNativeNotifications?.isNative)return;
     let fcmToken='';
     try{fcmToken=localStorage.getItem('smartnote_fcm_token')||''}catch{}
-    if(!fcmToken)return;
+    if(!fcmToken){
+      const diagnostic={stage:'token_missing_after_login',at:new Date().toISOString()};
+      try{localStorage.setItem('smartnote_fcm_sync_status',JSON.stringify(diagnostic))}catch{}
+      console.warn('[SmartNote FCM] No token has been issued by the Android plugin yet.');
+      return;
+    }
     try{
       const result=await apiPost({action:'push_register',fcmToken,platform:'android'});
-      console.info('[SmartNote FCM] Token saved in Supabase:',!!result.registered);
-      try{localStorage.setItem('smartnote_fcm_sync_status',JSON.stringify({ok:true,at:new Date().toISOString()}))}catch{}
+      const status={ok:true,stage:'saved_in_supabase',registered:!!result.registered,at:new Date().toISOString()};
+      console.info('[SmartNote FCM] Token saved in Supabase:',status.registered);
+      try{localStorage.setItem('smartnote_fcm_sync_status',JSON.stringify(status))}catch{}
+      window.dispatchEvent(new CustomEvent('smartnote-fcm-sync-result',{detail:status}));
     }catch(error){
+      const status={ok:false,stage:'supabase_save_failed',error:String(error?.message||error),at:new Date().toISOString()};
       console.error('[SmartNote FCM] Supabase token save failed:',error);
-      try{localStorage.setItem('smartnote_fcm_sync_status',JSON.stringify({ok:false,error:String(error?.message||error),at:new Date().toISOString()}))}catch{}
+      try{localStorage.setItem('smartnote_fcm_sync_status',JSON.stringify(status))}catch{}
+      window.dispatchEvent(new CustomEvent('smartnote-fcm-sync-result',{detail:status}));
     }
   }
   window.addEventListener('smartnote-fcm-token',()=>syncFcmDeviceToken());
+  window.addEventListener('smartnote-fcm-diagnostic',event=>{
+    const d=event.detail||{};
+    console.warn('[SmartNote FCM] Diagnostic:',d);
+    if(d.stage==='registration_error'||d.stage==='register_exception'){
+      toast('فشل تسجيل إشعارات الهاتف: '+String(d.error||d.stage));
+    }
+  });
+  window.addEventListener('smartnote-fcm-sync-result',event=>{
+    const d=event.detail||{};
+    if(d.ok)toast('تم تسجيل جهازك لاستقبال الإشعارات');
+    else toast('تعذر حفظ رمز الإشعارات في Supabase: '+String(d.error||'خطأ غير معروف'));
+  });
   async function afterLogin(preloadedData,preloadedRevision){
     if(currentUser?.mustChangePassword){const oldPassword=prompt(document.documentElement.lang==='en'?'Temporary password:':'أدخل كلمة المرور المؤقتة:');const newPassword=prompt(document.documentElement.lang==='en'?'Choose a new password (at least 10 characters):':'اختر كلمة مرور جديدة (10 أحرف على الأقل):');if(!oldPassword||!newPassword||newPassword.length<10){authToken='';currentUser=null;localStorage.removeItem(SESSION_KEY);showLogin(document.documentElement.lang==='en'?'Password change is required to continue.':'يجب تغيير كلمة المرور للمتابعة.');return}try{await apiPost({action:'change_password',currentPassword:oldPassword,newPassword});currentUser.mustChangePassword=false;localStorage.setItem(SESSION_KEY,JSON.stringify({token:authToken,user:currentUser}));toast(document.documentElement.lang==='en'?'Password updated.':'تم تغيير كلمة المرور بنجاح')}catch(error){authToken='';currentUser=null;localStorage.removeItem(SESSION_KEY);showLogin(document.documentElement.lang==='en'?'Could not change password. Sign in again.':'تعذر تغيير كلمة المرور. سجل الدخول مرة أخرى.');return}}
     const result=preloadedData&&typeof preloadedData==='object'?{data:preloadedData,revision:preloadedRevision}:await apiPost({action:'load'});cloudRevision=Number(result.revision??preloadedRevision??0)||0;db=normalizeDatabase(result.data||{});isReady=true;localRevision=0;cacheLocalDatabase(db,hasPendingSync());renderAll();syncNativeTaskReminders();syncFcmDeviceToken();
