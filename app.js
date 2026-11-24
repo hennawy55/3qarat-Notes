@@ -471,6 +471,7 @@
             if(document.querySelector('.assignment-popup'))toast(assignmentText('تم تحديث بيانات المتابعة من مستخدم آخر','Follow-up updated by another user'));
           }
           if(changed.includes('notifications'))await refreshUnifiedNotifications(false,true);else if(changed.some(table=>['assignments','reassignment_requests'].includes(table)))await refreshUnifiedNotifications();
+          if(changed.includes('profiles')&&currentUser?.role==='admin'&&document.getElementById('adminPanel')?.style.display==='flex')await openAdminPanel();
         },220);
       }).subscribe(status=>{
         if(status==='SUBSCRIBED')setConnection(true,assignmentText('المزامنة اللحظية مفعّلة','Live synchronization is active'));
