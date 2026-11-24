@@ -71,6 +71,23 @@ if (isNative) {
       return granted;
     },
 
+    async showInstantNotification({ id, title, body, assignmentId = '', notificationId = '' } = {}) {
+      if (!(await hasPermission(false))) return;
+      await ensureChannel();
+      const notificationIdNumber = stableId('server:' + (id || notificationId || Date.now()));
+      await LocalNotifications.schedule({
+        notifications: [{
+          id: notificationIdNumber,
+          title: String(title || 'إشعار جديد').slice(0, 120),
+          body: String(body || '').slice(0, 500),
+          schedule: { at: new Date(Date.now() + 1000) },
+          channelId: 'smartnote-reminders',
+          smallIcon: 'ic_launcher',
+          extra: { smartNoteServerNotification: true, assignmentId, notificationId }
+        }]
+      });
+    },
+
     async syncTaskReminders(tasks = []) {
       if (!(await hasPermission(false))) return;
       await ensureChannel();
@@ -137,9 +154,13 @@ if (isNative) {
   };
 
   LocalNotifications.addListener('localNotificationActionPerformed', event => {
-    const taskId = event.notification?.extra?.taskId;
+    const extra = event.notification?.extra || {};
+    const taskId = extra.taskId;
     if (typeof taskId === 'string') {
-      window.dispatchEvent(new CustomEvent('smartnote-open-task', { detail: { taskId, key: event.notification?.extra?.key } }));
+      window.dispatchEvent(new CustomEvent('smartnote-open-task', { detail: { taskId, key: extra.key } }));
+    }
+    if (typeof extra.assignmentId === 'string' && extra.assignmentId) {
+      window.dispatchEvent(new CustomEvent('smartnote-open-assignment', { detail: { assignmentId: extra.assignmentId } }));
     }
   });
 }
