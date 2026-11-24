@@ -117,6 +117,7 @@ async function notificationAction(action:string,b:any,u:any){
  if(action==="notification_read"){const rows=await needData<any[]>(db.from("notifications").update({is_read:true,read_at:new Date().toISOString()}).eq("id",String(b.notificationId||"")).eq("user_id",u.id).select("id"),"notification_update_failed");if(!rows.length)throw new Error("notification_not_found");return {ok:true,read:true};}
  if(action==="notification_read_all"){const {error}=await db.from("notifications").update({is_read:true,read_at:new Date().toISOString()}).eq("user_id",u.id).eq("is_read",false);if(error)throw new Error("notification_update_failed");return {ok:true,readAll:true};}
  if(action==="notification_delete"){const rows=await needData<any[]>(db.from("notifications").delete().eq("id",String(b.notificationId||"")).eq("user_id",u.id).select("id"),"notification_delete_failed");if(!rows.length)throw new Error("notification_not_found");return {ok:true,deleted:true};}
+ if(action==="notification_delete_all"){const {error}=await db.from("notifications").delete().eq("user_id",u.id);if(error)throw new Error("notification_delete_failed");return {ok:true,deletedAll:true};}
  return null;
 }
 
