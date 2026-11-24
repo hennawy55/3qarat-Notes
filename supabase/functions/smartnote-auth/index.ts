@@ -177,14 +177,16 @@ Deno.serve(async(req:Request)=>{
    if(target.role==="admin"&&status==="disabled"){const {count,error:countError}=await db.from("profiles").select("id",{count:"exact",head:true}).eq("role","admin").eq("status","active");if(countError){console.error("ACTIVE ADMIN COUNT ERROR:",countError);return out(500,{ok:false,error:"status_update_failed"});}if((count||0)<=1)return out(400,{ok:false,error:"last_active_admin"});}
    const {error}=await db.from("profiles").update({status}).eq("id",id);if(error)return out(500,{ok:false,error:"status_update_failed"});
    if(status==="disabled"){
-    const {error:revokeError}=await db.from("auth_sessions").update({revoked_at:new Date().toISOString()}).eq("user_id",id).is("revoked_at",null);
+    const {data:linkedAssignments,error:linkedError}=await db.from("assignments").select("id").or("created_by.eq."+id+",owner_leader_id.eq."+id+",assignee_id.eq."+id).limit(1);if(linkedError)return out(500,{ok:false,error:"delete_failed"});if((linkedAssignments||[]).length)return out(400,{ok:false,error:"user_has_assignments"});
+   const {error:revokeError}=await db.from("auth_sessions").update({revoked_at:new Date().toISOString()}).eq("user_id",id).is("revoked_at",null);
     if(revokeError){console.error("STATUS SESSION REVOKE ERROR:",revokeError);return out(500,{ok:false,error:"status_updated_session_revoke_failed",status_updated:true});}
    }
    await audit(auth.p.id,"admin_set_status",id,{status});return out(200,{ok:true});
   }
   if(action==="admin_set_role"){
-   const id=typeof b.userId==="string"?b.userId:"",role=b.role;if(!id||!["admin","leader","user"].includes(role))return out(400,{ok:false,error:"invalid_role"});
+   const id=typeof b.userId==="string"?b.userId:"",role=b.role;if(!id||!["admin","leader","user"].includes(role))return out(400,{ok:false,error:"invalid_role"});if(id===auth.p.id)return out(400,{ok:false,error:"cannot_change_own_role"});
    const {data:target,error:targetError}=await db.from("profiles").select("id,role").eq("id",id).maybeSingle();if(targetError){console.error("ROLE TARGET LOOKUP ERROR:",targetError);return out(500,{ok:false,error:"role_update_failed"});}if(!target)return out(404,{ok:false,error:"user_not_found"});
+   if(role==="user"){const {data:owned,error:ownedError}=await db.from("assignments").select("id").eq("owner_leader_id",id).limit(1);if(ownedError)return out(500,{ok:false,error:"role_update_failed"});if((owned||[]).length)return out(400,{ok:false,error:"user_manages_assignments"});}
    if(target.role==="admin"&&role!=="admin"){const {count,error:countError}=await db.from("profiles").select("id",{count:"exact",head:true}).eq("role","admin").eq("status","active");if(countError){console.error("ACTIVE ADMIN COUNT ERROR:",countError);return out(500,{ok:false,error:"role_update_failed"});}if((count||0)<=1)return out(400,{ok:false,error:"last_active_admin"});}
    const {error}=await db.from("profiles").update({role}).eq("id",id);if(error)return out(500,{ok:false,error:"role_update_failed"});
    await audit(auth.p.id,"admin_set_role",id,{role});return out(200,{ok:true});
