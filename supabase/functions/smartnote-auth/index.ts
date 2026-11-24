@@ -141,7 +141,16 @@ async function assignmentAction(action:string,b:any,u:any){
  return null;
 }
 async function notificationAction(action:string,b:any,u:any){
- if(action==="push_register"){const token=typeof b.fcmToken==="string"?b.fcmToken.trim():"";if(token.length<40||token.length>4096)throw new Error("invalid_push_token");await needData(db.from("push_devices").upsert({user_id:u.id,fcm_token:token,platform:"android",updated_at:new Date().toISOString()},{onConflict:"fcm_token"}),"push_device_register_failed");return {ok:true,registered:true};}
+ if(action==="push_register"){
+  const token=typeof b.fcmToken==="string"?b.fcmToken.trim():"";
+  if(token.length<40||token.length>4096)return out(400,{ok:false,error:"invalid_push_token",stage:"validate_token"});
+  const {data,error}=await db.from("push_devices").upsert({user_id:u.id,fcm_token:token,platform:"android",updated_at:new Date().toISOString()},{onConflict:"fcm_token"}).select("id,user_id").single();
+  if(error){
+   console.error("FCM DEVICE UPSERT ERROR:",{code:error.code,message:error.message,details:error.details,hint:error.hint});
+   return out(500,{ok:false,error:"push_device_register_failed",stage:"database_upsert",dbCode:error.code||"",dbMessage:error.message||"",dbDetails:error.details||""});
+  }
+  return {ok:true,registered:true,deviceId:data.id};
+ }
  if(action==="push_unregister"){const token=typeof b.token==="string"?b.token.trim():"";if(token)await needData(db.from("push_devices").delete().eq("user_id",u.id).eq("fcm_token",token),"push_device_unregister_failed");return {ok:true,unregistered:true};}
  if(action==="notification_list"){const all=await needData<any[]>(db.from("notifications").select("id,assignment_id,type,title,body,is_read,created_at").eq("user_id",u.id).order("created_at",{ascending:false}).order("id",{ascending:false}).limit(5000),"notifications_lookup_failed");const unreadCount=all.filter(n=>!n.is_read).length,totalCount=all.length;let rows=all;if(b.cursor){const [time,...rest]=String(b.cursor).split("|"),lastId=rest.join("|");rows=all.filter(n=>n.created_at<time||(n.created_at===time&&n.id<lastId));}const page=rows.slice(0,100),hasMore=rows.length>100,last=page[page.length-1];return {ok:true,notifications:page.map(n=>({id:n.id,assignmentId:n.assignment_id||"",type:n.type,title:n.title,body:n.body,isRead:n.is_read,createdAt:n.created_at})),nextCursor:hasMore&&last?last.created_at+"|"+last.id:"",hasMore,unreadCount,totalCount};}
  if(action==="notification_read"){const rows=await needData<any[]>(db.from("notifications").update({is_read:true,read_at:new Date().toISOString()}).eq("id",String(b.notificationId||"")).eq("user_id",u.id).select("id"),"notification_update_failed");if(!rows.length)throw new Error("notification_not_found");return {ok:true,read:true};}
@@ -245,5 +254,9 @@ Deno.serve(async(req:Request)=>{
    await audit(auth.p.id,"admin_delete_user",id);return out(200,{ok:true});
   }
   return out(400,{ok:false,error:"unknown_action"});
- }catch(_){return out(500,{ok:false,error:"internal_error"});}
+ }catch(error){
+  console.error("SMARTNOTE REQUEST ERROR:",error);
+  const message=String((error as any)?.message||error||"unknown_error");
+  return out(500,{ok:false,error:message==="push_device_register_failed"?"push_device_register_failed":"internal_error",message});
+ }
 });
