@@ -87,7 +87,7 @@ async function login(u:string,pw:string){
 async function needData<T=any>(q:PromiseLike<any>,code="database_operation_failed"):Promise<T>{const r=await q;if(r.error){console.error(code,r.error);throw new Error(code);}return r.data as T;}
 async function profileFor(id:string){return await needData<any>(db.from("profiles").select("id,username,role,status,must_change_password").eq("id",id).maybeSingle(),"profile_lookup_failed");}
 async function activity(assignmentId:string,u:any,action:string,details:Record<string,unknown>={}){await needData(db.from("assignment_activity").insert({assignment_id:assignmentId,actor_id:u.id,actor_name:u.username,action,details}),"activity_write_failed");}
-const b64url=(value:string)=>btoa(value).replace(/=/g,"").replace(/\\+/g,"-").replace(/\\//g,"_");
+const b64url=(value:string)=>btoa(value).replaceAll("=","").replaceAll("+","-").replaceAll("/","_");
 let fcmAccessToken="",fcmAccessTokenExpires=0;
 function firebaseAccount(){
  const raw=Deno.env.get("FIREBASE_SERVICE_ACCOUNT_JSON")||"";
