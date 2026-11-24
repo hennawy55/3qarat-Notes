@@ -1,0 +1,2 @@
+[functions.smartnote-auth]
+verify_jwt = false
