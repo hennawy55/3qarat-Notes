@@ -13,8 +13,8 @@
   const emptyDB=()=>({version:1,workspaces:[],projects:[],units:[],notes:[],clients:[],tasks:[]});
   let db=emptyDB(), editing=null, isReady=false, saveQueue=Promise.resolve(), syncInFlight=false, writesInProgress=0, localRevision=0, cloudRevision=0;
   let assignedItems=[],assignedArchivedItems=[],assignmentPeople=[],serverNotifications=[],serverNotificationCursor='',serverNotificationHasMore=false,serverNotificationUnreadCount=0,serverNotificationTotalCount=0;
-  const localDataKey=()=>`smartnote-supabase-local-db-v1:${encodeURIComponent(currentUser?.username||'')}`;
-  const pendingSyncKey=()=>`smartnote-supabase-pending-sync-v1:${encodeURIComponent(currentUser?.username||'')}`;
+  const localDataKey=()=>`smartnote-local-db-v1:${encodeURIComponent(currentUser?.username||'')}`;
+  const pendingSyncKey=()=>`smartnote-pending-sync-v1:${encodeURIComponent(currentUser?.username||'')}`;
   const cloudRevisionKey=()=>`smartnote-supabase-cloud-revision-v1:${encodeURIComponent(currentUser?.username||'')}`;
   function cacheLocalDatabase(state=db,pending=false){if(!currentUser?.username)return;try{localStorage.setItem(localDataKey(),JSON.stringify(cloudPayload(state)));localStorage.setItem(cloudRevisionKey(),String(cloudRevision||0));if(pending)localStorage.setItem(pendingSyncKey(),'1')}catch(error){toast('تعذر حفظ نسخة محلية: '+error.message)}}
   function readLocalDatabase(){try{const raw=localStorage.getItem(localDataKey());return raw?normalizeDatabase(JSON.parse(raw)):null}catch{return null}}
