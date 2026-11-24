@@ -480,3 +480,22 @@ html[dir="ltr"] .admin-password-row{direction:ltr}
 .notice-menu button.danger{color:var(--red)}
 .task-alert .unread-dot{width:7px;height:7px;border-radius:50%;background:var(--blue);align-self:start}
 @media(max-width:700px){.notification-panel-head{gap:6px}.notification-mark-all{font-size:9px;padding:6px 7px}.unified-notice-head{grid-template-columns:minmax(0,1fr) auto auto;gap:7px}}
+
+/* Inline notification actions; no dropdown layer can overlap neighboring cards */
+.notification-header-actions{display:flex;align-items:center;gap:6px;flex:none}
+.notification-header-actions .btn{display:inline-flex;align-items:center;gap:5px}
+.notification-header-actions svg{width:13px;height:13px}
+.notification-delete-all{color:var(--red);border-color:#e6c6cd;background:#fff7f8}
+.notice-actions{display:inline-flex;align-items:center;gap:5px;flex:none}
+.notice-action-btn{width:29px;height:29px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--muted);display:grid;place-items:center;padding:0}
+.notice-action-btn svg{width:15px;height:15px}
+.notice-action-btn.danger{color:var(--red)}
+.notice-action-btn:disabled{opacity:.45;cursor:not-allowed}
+.notice-menu-wrap,.notice-menu,.notice-menu-toggle{display:none!important}
+@media(max-width:700px){
+ .notification-panel-head{align-items:center;flex-wrap:wrap}
+ .notification-header-actions{gap:4px}
+ .notification-header-actions .btn{font-size:9px;padding:6px 7px}
+ .unified-notice-head{grid-template-columns:minmax(0,1fr) auto auto;gap:6px}
+ .notice-action-btn{width:27px;height:27px}
+}
