@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-const db=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,{auth:{autoRefreshToken:false,persistSession:false}});
+const db=createClient(Deno.env.get("PROJECT_URL")!,Deno.env.get("SERVICE_ROLE_KEY")!,{auth:{autoRefreshToken:false,persistSession:false}});
 const ITER=600000,DAYS=30,BOOTSTRAP=Deno.env.get("SMARTNOTE_BOOTSTRAP_SECRET")||"";
 const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, apikey, content-type, x-client-info, x-smartnote-session, x-smartnote-bootstrap","Access-Control-Allow-Methods":"POST, OPTIONS"};
 const out=(status:number,data:Record<string,unknown>)=>new Response(JSON.stringify(data),{status,headers:{...cors,"Content-Type":"application/json"}});
