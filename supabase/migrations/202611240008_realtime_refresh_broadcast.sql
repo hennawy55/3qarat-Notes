@@ -13,6 +13,7 @@ declare
   v_assignment_id uuid;
   v_user_id uuid;
   v_topic text;
+  v_session record;
 begin
   if tg_table_name = 'assignments' then
     if tg_op = 'DELETE' then
@@ -51,18 +52,27 @@ begin
 
   foreach v_user_id in array coalesce(v_users, array[]::uuid[]) loop
     if v_user_id is not null then
-      v_topic := 'smartnote-user:' || v_user_id::text;
-      insert into realtime.messages (topic, event, payload, private)
-      values (
-        v_topic,
-        'refresh',
-        jsonb_build_object(
-          'table', tg_table_name,
-          'operation', tg_op,
-          'changedAt', clock_timestamp()
-        ),
-        false
-      );
+      -- Send only to active sessions for this user. The topic is derived from
+      -- the session token hash, so another user's channel name is not guessable.
+      for v_session in
+        select token_hash
+        from public.auth_sessions
+        where user_id = v_user_id
+          and revoked_at is null
+          and expires_at > now()
+      loop
+        v_topic := 'smartnote-session:' || v_session.token_hash;
+        perform realtime.send(
+          jsonb_build_object(
+            'table', tg_table_name,
+            'operation', tg_op,
+            'changedAt', clock_timestamp()
+          ),
+          'refresh',
+          v_topic,
+          false
+        );
+      end loop;
     end if;
   end loop;
 
