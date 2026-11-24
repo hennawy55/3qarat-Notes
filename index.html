@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#762236">
   <meta name="description" content="Organize real estate projects, units, clients, notes and follow-ups.">
+  <link rel="apple-touch-icon" href="./icons/smartnote-icon.svg">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/svg+xml" href="./icons/smartnote-icon.svg">
   <!-- Optional app icon omitted until local icon assets are provided. -->
@@ -29,7 +30,7 @@
       <button data-view="assigned" title="المتابعات الموجهة" aria-label="المتابعات الموجهة"><span class="nav-ico"><i data-lucide="inbox"></i></span><span class="nav-text">المتابعات الموجهة</span></button>
     </nav></div>
     <div class="side-bottom">
-      <div class="connection"><div class="connection-row"><span class="dot" id="connectionDot"></span><b id="connectionText">جاري الاتصال...</b></div><small id="connectionHint">يتم تحميل بياناتك من Google Sheets.</small></div>
+      <div class="connection"><div class="connection-row"><span class="dot" id="connectionDot"></span><b id="connectionText">جاري الاتصال...</b></div><small id="connectionHint">يتم تحميل بياناتك من Supabase.</small></div>
     </div>
   </aside>
   <main class="main">
@@ -64,7 +65,7 @@
 <div id="onlineGate" class="online-gate">
   <div class="online-gate-card">
     <div class="online-gate-icon">☁</div><h2 class="online-gate-title">الاتصال بالإنترنت مطلوب</h2>
-    <p id="onlineGateMessage" class="online-gate-message">هذا التطبيق يعمل أونلاين فقط، ويحتاج اتصالاً بقاعدة بيانات Google Sheets.</p>
+    <p id="onlineGateMessage" class="online-gate-message">هذا التطبيق يعمل أونلاين فقط، ويحتاج اتصالاً بقاعدة بيانات Supabase.</p>
     <button class="btn primary" id="retryConnection">إعادة المحاولة</button>
   </div>
 </div>
