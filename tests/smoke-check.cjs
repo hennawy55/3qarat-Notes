@@ -35,5 +35,5 @@ assert(app.includes('startRealtimeSync') && app.includes("event:'refresh'") && a
 assert(app.includes('data-unified-open=') && !app.includes('task-alert-actions'), 'Notification cards must be fully clickable without a separate open button');
 assert(migrationRealtime.includes('realtime.send') && migrationRealtime.includes('smartnote-session:') && migrationRealtime.includes("'refresh'"), 'Database triggers must broadcast minimal session-scoped refresh events');
 assert(styles.includes('.task-alert.is-unread') && styles.includes('.notification-panel'), 'Notification panel must use compact unread-aware card styling');
-assert(nativeNotifications.includes('showInstantNotification') && nativeNotifications.includes('OPEN_ASSIGNED_NOTIFICATION') === false, 'Android must support immediate incoming notification display');
+assert(nativeNotifications.includes('showInstantNotification') && nativeNotifications.includes('smartnote-open-assignment'), 'Android must support immediate incoming notification display');
 console.log('SmartNote Supabase migration smoke checks passed.');
