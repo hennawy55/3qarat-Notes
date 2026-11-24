@@ -31,12 +31,25 @@
   function toast(msg){const t=document.getElementById('toast');t.textContent=window.appTranslate?.(msg)||msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800)}
   let startupNotificationPermissionRequested=false;
   async function requestNotificationPermissionOnStartup(){
-    if(startupNotificationPermissionRequested)return;startupNotificationPermissionRequested=true;
+    if(startupNotificationPermissionRequested)return;
+    const native=window.smartNoteNativeNotifications;
+    if(!native?.isNative)return;
+    startupNotificationPermissionRequested=true;
     try{
-      if(window.smartNoteNativeNotifications?.isNative){if(window.smartNoteNativeNotifications.getPermissionStatus){const status=await window.smartNoteNativeNotifications.getPermissionStatus();if(status==='granted'||status?.granted)return}const granted=await window.smartNoteNativeNotifications.requestPermission();if(granted){await syncNativeTaskReminders();checkTaskNotifications()}return}
-      // System notifications are intentionally mobile-app only; web stays in-app.
-      return;
-    }catch(error){console.warn('Notification permission request was unavailable:',error)}
+      // FCM registration is independent from local-notification permission.
+      await native.registerForPushNotifications?.();
+      const status=await native.getPermissionStatus?.();
+      if(status!=='granted'&&status?.granted!==true){
+        const granted=await native.requestPermission();
+        if(granted){await syncNativeTaskReminders();checkTaskNotifications()}
+      }else{
+        await syncNativeTaskReminders();
+        checkTaskNotifications();
+      }
+    }catch(error){
+      startupNotificationPermissionRequested=false;
+      console.warn('Notification permission request was unavailable:',error);
+    }
   }
   function unlockNotificationAudio(){if(notificationAudio){if(notificationAudio.state==='suspended')notificationAudio.resume().catch(()=>toast('تعذر تشغيل صوت التنبيه في هذا المتصفح'));return}const AudioContextClass=window.AudioContext||window.webkitAudioContext;if(!AudioContextClass)return;try{notificationAudio=new AudioContextClass();if(notificationAudio.state==='suspended')notificationAudio.resume().catch(()=>toast('تعذر تشغيل صوت التنبيه في هذا المتصفح'))}catch(err){toast('تعذر تفعيل صوت التنبيه: '+err.message)}}
   function playNotificationSound(){if(!notificationAudio)return false;if(notificationAudio.state==='suspended'){notificationAudio.resume().catch(()=>toast('تعذر تشغيل صوت التنبيه في هذا المتصفح'));return false}if(notificationAudio.state!=='running')return false;try{const now=notificationAudio.currentTime;[659,880,1175].forEach((frequency,index)=>{const oscillator=notificationAudio.createOscillator(),gain=notificationAudio.createGain(),start=now+index*.09;oscillator.type='triangle';oscillator.frequency.value=frequency;gain.gain.setValueAtTime(.0001,start);gain.gain.exponentialRampToValueAtTime(.13,start+.015);gain.gain.exponentialRampToValueAtTime(.0001,start+.18);oscillator.connect(gain);gain.connect(notificationAudio.destination);oscillator.start(start);oscillator.stop(start+.2)});return true}catch(err){toast('تعذر تشغيل نغمة التنبيه: '+err.message);return false}}
