@@ -1,4 +1,5 @@
-name: Build Android APK
+name: Build Android APK and Web
+# Rebuild trigger: regenerate both distributable artifacts without changing app source.
 on:
   workflow_dispatch:
   push:
