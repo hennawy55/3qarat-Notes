@@ -87,7 +87,35 @@ async function login(u:string,pw:string){
 async function needData<T=any>(q:PromiseLike<any>,code="database_operation_failed"):Promise<T>{const r=await q;if(r.error){console.error(code,r.error);throw new Error(code);}return r.data as T;}
 async function profileFor(id:string){return await needData<any>(db.from("profiles").select("id,username,role,status,must_change_password").eq("id",id).maybeSingle(),"profile_lookup_failed");}
 async function activity(assignmentId:string,u:any,action:string,details:Record<string,unknown>={}){await needData(db.from("assignment_activity").insert({assignment_id:assignmentId,actor_id:u.id,actor_name:u.username,action,details}),"activity_write_failed");}
-async function notify(userId:string,assignmentId:string,type:string,title:string,body:string){if(userId)await needData(db.from("notifications").insert({user_id:userId,assignment_id:assignmentId||null,type,title,body}),"notification_write_failed");}
+const b64url=(value:string)=>btoa(value).replace(/=/g,"").replace(/\\+/g,"-").replace(/\\//g,"_");
+let fcmAccessToken="",fcmAccessTokenExpires=0;
+async function firebaseAccessToken(){
+ const raw=Deno.env.get("FIREBASE_SERVICE_ACCOUNT_JSON")||"";if(!raw)return "";
+ const account=JSON.parse(raw);if(fcmAccessToken&&Date.now()<fcmAccessTokenExpires-60000)return fcmAccessToken;
+ const now=Math.floor(Date.now()/1000),enc=(s:string)=>b64url(s);
+ const unsigned=enc(JSON.stringify({alg:"RS256",typ:"JWT"}))+"."+enc(JSON.stringify({iss:account.client_email,scope:"https://www.googleapis.com/auth/firebase.messaging",aud:"https://oauth2.googleapis.com/token",iat:now,exp:now+3600}));
+ const pem=String(account.private_key||"").replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\\s/g,"");
+ const binary=Uint8Array.from(atob(pem),c=>c.charCodeAt(0));
+ const key=await crypto.subtle.importKey("pkcs8",binary,{name:"RSASSA-PKCS1-v1_5",hash:"SHA-256"},false,["sign"]);
+ const signature=new Uint8Array(await crypto.subtle.sign("RSASSA-PKCS1-v1_5",key,new TextEncoder().encode(unsigned)));
+ const jwt=unsigned+"."+b64url(String.fromCharCode(...signature));
+ const response=await fetch("https://oauth2.googleapis.com/token",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({grant_type:"urn:ietf:params:oauth:grant-type:jwt-bearer",assertion:jwt})});
+ const result=await response.json();if(!response.ok)throw new Error("firebase_oauth_failed");
+ fcmAccessToken=result.access_token;fcmAccessTokenExpires=Date.now()+Number(result.expires_in||3600)*1000;return fcmAccessToken;
+}
+async function sendPush(userId:string,assignmentId:string,title:string,body:string){
+ try{
+  const {data:devices,error}=await db.from("push_devices").select("fcm_token").eq("user_id",userId);
+  if(error)throw error;if(!devices?.length)return;
+  const raw=Deno.env.get("FIREBASE_SERVICE_ACCOUNT_JSON")||"";if(!raw){console.warn("FCM not configured: FIREBASE_SERVICE_ACCOUNT_JSON is missing");return;}
+  const projectId=JSON.parse(raw).project_id,access=await firebaseAccessToken();
+  await Promise.all(devices.map(async(device:any)=>{
+   const response=await fetch("https://fcm.googleapis.com/v1/projects/"+projectId+"/messages:send",{method:"POST",headers:{Authorization:"Bearer "+access,"Content-Type":"application/json"},body:JSON.stringify({message:{token:device.fcm_token,notification:{title,body},data:{assignmentId:String(assignmentId||""),type:"follow_up"},android:{priority:"high",notification:{channel_id:"smartnote-reminders",sound:"default"}}}})});
+   if(!response.ok){const errorBody=await response.text();console.warn("FCM delivery failed:",response.status,errorBody.slice(0,300));if(response.status===404||response.status===400)await db.from("push_devices").delete().eq("fcm_token",device.fcm_token);}
+  }));
+ }catch(error){console.error("FCM send error:",error);}
+}
+async function notify(userId:string,assignmentId:string,type:string,title:string,body:string){if(userId){await needData(db.from("notifications").insert({user_id:userId,assignment_id:assignmentId||null,type,title,body}),"notification_write_failed");await sendPush(userId,assignmentId,title,body);}}
 async function getAssignment(id:string){return await needData<any>(db.from("assignments").select("*").eq("id",id).maybeSingle(),"assignment_lookup_failed");}
 function assignmentDto(a:any){const type=String(a.assignment_type||"task"),clientName=String(a.client_name||"");let title=String(a.title||"");if(type==="client")title=clientName||title.replace(/^متابعة عميل\s*:\s*/,"");return {id:String(a.id),title,description:String(a.description||""),type,clientName,clientPhone:String(a.client_phone||""),status:String(a.status||"new"),priority:String(a.priority||"normal"),dueAt:String(a.due_at||""),createdAt:String(a.created_at||""),assignedAt:String(a.assigned_at||""),updatedAt:String(a.updated_at||""),createdBy:String(a.created_by||""),createdByName:String(a.created_by_name||""),ownerLeaderId:String(a.owner_leader_id||""),ownerLeaderName:String(a.owner_leader_name||""),assigneeId:String(a.assignee_id||""),assigneeName:String(a.assignee_name||""),archivedAt:String(a.archived_at||""),viewedAt:String(a.viewed_at||"")};}
 function canManageAssignment(u:any,a:any){return u.role==="admin"||a.owner_leader_id===u.id;}
@@ -113,6 +141,8 @@ async function assignmentAction(action:string,b:any,u:any){
  return null;
 }
 async function notificationAction(action:string,b:any,u:any){
+ if(action==="push_register"){const token=typeof b.token==="string"?b.token.trim():"";if(token.length<40||token.length>4096)throw new Error("invalid_push_token");await needData(db.from("push_devices").upsert({user_id:u.id,fcm_token:token,platform:"android",updated_at:new Date().toISOString()},{onConflict:"fcm_token"}),"push_device_register_failed");return {ok:true,registered:true};}
+ if(action==="push_unregister"){const token=typeof b.token==="string"?b.token.trim():"";if(token)await needData(db.from("push_devices").delete().eq("user_id",u.id).eq("fcm_token",token),"push_device_unregister_failed");return {ok:true,unregistered:true};}
  if(action==="notification_list"){const all=await needData<any[]>(db.from("notifications").select("id,assignment_id,type,title,body,is_read,created_at").eq("user_id",u.id).order("created_at",{ascending:false}).order("id",{ascending:false}).limit(5000),"notifications_lookup_failed");const unreadCount=all.filter(n=>!n.is_read).length,totalCount=all.length;let rows=all;if(b.cursor){const [time,...rest]=String(b.cursor).split("|"),lastId=rest.join("|");rows=all.filter(n=>n.created_at<time||(n.created_at===time&&n.id<lastId));}const page=rows.slice(0,100),hasMore=rows.length>100,last=page[page.length-1];return {ok:true,notifications:page.map(n=>({id:n.id,assignmentId:n.assignment_id||"",type:n.type,title:n.title,body:n.body,isRead:n.is_read,createdAt:n.created_at})),nextCursor:hasMore&&last?last.created_at+"|"+last.id:"",hasMore,unreadCount,totalCount};}
  if(action==="notification_read"){const rows=await needData<any[]>(db.from("notifications").update({is_read:true,read_at:new Date().toISOString()}).eq("id",String(b.notificationId||"")).eq("user_id",u.id).select("id"),"notification_update_failed");if(!rows.length)throw new Error("notification_not_found");return {ok:true,read:true};}
  if(action==="notification_read_all"){const {error}=await db.from("notifications").update({is_read:true,read_at:new Date().toISOString()}).eq("user_id",u.id).eq("is_read",false);if(error)throw new Error("notification_update_failed");return {ok:true,readAll:true};}
