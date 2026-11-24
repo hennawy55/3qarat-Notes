@@ -262,7 +262,20 @@
     }
     gate.style.display='flex';document.getElementById('loginError').textContent=message;
   }
-  async function syncFcmDeviceToken(){if(!authToken||!window.smartNoteNativeNotifications?.isNative)return;let token='';try{token=localStorage.getItem('smartnote_fcm_token')||''}catch{}if(token){try{await apiPost({action:'push_register',token,platform:'android'})}catch(error){console.warn('FCM token sync failed:',error)}}}
+  async function syncFcmDeviceToken(){
+    if(!authToken||!window.smartNoteNativeNotifications?.isNative)return;
+    let fcmToken='';
+    try{fcmToken=localStorage.getItem('smartnote_fcm_token')||''}catch{}
+    if(!fcmToken)return;
+    try{
+      const result=await apiPost({action:'push_register',fcmToken,platform:'android'});
+      console.info('[SmartNote FCM] Token saved in Supabase:',!!result.registered);
+      try{localStorage.setItem('smartnote_fcm_sync_status',JSON.stringify({ok:true,at:new Date().toISOString()}))}catch{}
+    }catch(error){
+      console.error('[SmartNote FCM] Supabase token save failed:',error);
+      try{localStorage.setItem('smartnote_fcm_sync_status',JSON.stringify({ok:false,error:String(error?.message||error),at:new Date().toISOString()}))}catch{}
+    }
+  }
   window.addEventListener('smartnote-fcm-token',()=>syncFcmDeviceToken());
   async function afterLogin(preloadedData,preloadedRevision){
     if(currentUser?.mustChangePassword){const oldPassword=prompt(document.documentElement.lang==='en'?'Temporary password:':'أدخل كلمة المرور المؤقتة:');const newPassword=prompt(document.documentElement.lang==='en'?'Choose a new password (at least 10 characters):':'اختر كلمة مرور جديدة (10 أحرف على الأقل):');if(!oldPassword||!newPassword||newPassword.length<10){authToken='';currentUser=null;localStorage.removeItem(SESSION_KEY);showLogin(document.documentElement.lang==='en'?'Password change is required to continue.':'يجب تغيير كلمة المرور للمتابعة.');return}try{await apiPost({action:'change_password',currentPassword:oldPassword,newPassword});currentUser.mustChangePassword=false;localStorage.setItem(SESSION_KEY,JSON.stringify({token:authToken,user:currentUser}));toast(document.documentElement.lang==='en'?'Password updated.':'تم تغيير كلمة المرور بنجاح')}catch(error){authToken='';currentUser=null;localStorage.removeItem(SESSION_KEY);showLogin(document.documentElement.lang==='en'?'Could not change password. Sign in again.':'تعذر تغيير كلمة المرور. سجل الدخول مرة أخرى.');return}}
