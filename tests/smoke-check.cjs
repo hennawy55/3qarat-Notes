@@ -33,7 +33,7 @@ assert(manifest.icons.some(icon => icon.src === 'icons/smartnote-icon.svg'), 'PW
 assert(supabaseConfig.includes('verify_jwt = false'), 'Custom-session Edge Function must disable gateway JWT verification');
 assert(app.includes('startRealtimeSync') && app.includes("event:'refresh'") && app.includes('smartnote-session:'), 'Client must subscribe to session-scoped realtime refresh broadcasts');
 assert(app.includes('data-unified-open=') && !app.includes('task-alert-actions'), 'Notification cards must be fully clickable without a separate open button');
-assert(migrationRealtime.includes('realtime.send') && migrationRealtime.includes('smartnote-session:') && migrationRealtime.includes("'refresh'"), 'Database triggers must broadcast minimal session-scoped refresh events');
+assert(migrationRealtime.includes('realtime.send') && migrationRealtime.includes('smartnote-session:') && migrationRealtime.includes("'refresh'") && migrationRealtime.includes('user_database_meta'), 'Database triggers must broadcast minimal session-scoped refresh events');
 assert(styles.includes('.task-alert.is-unread') && styles.includes('.notification-panel'), 'Notification panel must use compact unread-aware card styling');
 assert(nativeNotifications.includes('showInstantNotification') && nativeNotifications.includes('smartnote-open-assignment'), 'Android must support immediate incoming notification display');
 console.log('SmartNote Supabase migration smoke checks passed.');
