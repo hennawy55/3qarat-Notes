@@ -1,7 +1,9 @@
 (() => {
   'use strict';
-  const API_URL='https://script.google.com/macros/s/AKfycbzCwbwSosfOCsH83SJhh_a1IOFhjDi0FXpeNlDBt1UC6yOd2t8nOGN3_Z-wHJr3N2bBkQ/exec';
-  const SESSION_KEY='smartnote-auth-session-v2';
+  const SUPABASE_URL='https://cantyrqkkbqwrajghluw.supabase.co';
+  const SUPABASE_PUBLISHABLE_KEY='sb_publishable_PdO0cP98yMMPHLUrJAES0A_b9Z4JlpY';
+  const API_URL=SUPABASE_URL+'/functions/v1/smartnote-auth';
+  const SESSION_KEY='smartnote-supabase-auth-session-v1';
   const DATABASE_NAME='SMARTNOTE_USER_DATABASE_V2';
   let authToken='', currentUser=null;
   const TYPES=['workspaces','projects','units','notes','clients','tasks'];
@@ -11,9 +13,9 @@
   const emptyDB=()=>({version:1,workspaces:[],projects:[],units:[],notes:[],clients:[],tasks:[]});
   let db=emptyDB(), editing=null, isReady=false, saveQueue=Promise.resolve(), syncInFlight=false, writesInProgress=0, localRevision=0, cloudRevision=0;
   let assignedItems=[],assignedArchivedItems=[],assignmentPeople=[],serverNotifications=[],serverNotificationCursor='',serverNotificationHasMore=false,serverNotificationUnreadCount=0,serverNotificationTotalCount=0;
-  const localDataKey=()=>`smartnote-local-db-v1:${encodeURIComponent(currentUser?.username||'')}`;
-  const pendingSyncKey=()=>`smartnote-pending-sync-v1:${encodeURIComponent(currentUser?.username||'')}`;
-  const cloudRevisionKey=()=>`smartnote-cloud-revision-v1:${encodeURIComponent(currentUser?.username||'')}`;
+  const localDataKey=()=>`smartnote-supabase-local-db-v1:${encodeURIComponent(currentUser?.username||'')}`;
+  const pendingSyncKey=()=>`smartnote-supabase-pending-sync-v1:${encodeURIComponent(currentUser?.username||'')}`;
+  const cloudRevisionKey=()=>`smartnote-supabase-cloud-revision-v1:${encodeURIComponent(currentUser?.username||'')}`;
   function cacheLocalDatabase(state=db,pending=false){if(!currentUser?.username)return;try{localStorage.setItem(localDataKey(),JSON.stringify(cloudPayload(state)));localStorage.setItem(cloudRevisionKey(),String(cloudRevision||0));if(pending)localStorage.setItem(pendingSyncKey(),'1')}catch(error){toast('تعذر حفظ نسخة محلية: '+error.message)}}
   function readLocalDatabase(){try{const raw=localStorage.getItem(localDataKey());return raw?normalizeDatabase(JSON.parse(raw)):null}catch{return null}}
   function hasPendingSync(){try{return localStorage.getItem(pendingSyncKey())==='1'}catch{return false}}
@@ -62,7 +64,7 @@
   function get(type,id){return db[type]?.find(x=>x.id===id)}
   function syncNativeTaskReminders(){if(!window.smartNoteNativeNotifications?.isNative||!isReady)return Promise.resolve();return window.smartNoteNativeNotifications.syncTaskReminders(db.tasks).catch(err=>toast('تعذر جدولة تذكيرات الهاتف: '+err.message))}
   function nameOf(type,id){return get(type,id)?.name||'غير مرتبط'}
-  function setConnection(ok,msg){document.getElementById('connectionDot').classList.toggle('online',!!ok);document.getElementById('connectionText').textContent=ok?'متصل بقاعدة البيانات':'غير متصل';document.getElementById('connectionHint').textContent=msg||(ok?'تم الاتصال بـ Google Sheets.':'يلزم الاتصال بالإنترنت وقاعدة البيانات.')}
+  function setConnection(ok,msg){document.getElementById('connectionDot').classList.toggle('online',!!ok);document.getElementById('connectionText').textContent=ok?'متصل بقاعدة البيانات':'غير متصل';document.getElementById('connectionHint').textContent=msg||(ok?'تم الاتصال بـ Supabase.':'يلزم الاتصال بالإنترنت وقاعدة البيانات.')}
   function showGate(message){document.getElementById('onlineGateMessage').textContent=message;document.getElementById('onlineGate').style.display='flex'}
   function hideGate(){document.getElementById('onlineGate').style.display='none'}
   function updateQuickAdd(view){const button=document.getElementById('quickAdd'),action=QUICK_ACTIONS[view];button.hidden=view==='assigned';button.dataset.quickAddType=action?.[0]||'';button.innerHTML=`<i data-lucide="plus"></i> ${action?.[1]||'إضافة جديدة'}`;if(window.lucide)window.lucide.createIcons({attrs:{'stroke-width':1.8}})}
@@ -125,14 +127,14 @@
       const data=Object.fromEntries(new FormData(e.target).entries());if(type==='note')data.tags=(data.tags||'').split(',').map(x=>x.trim()).filter(Boolean);
       const now=new Date().toISOString(),record={...old,...data,id:id||uid(),createdAt:old?.createdAt||now,updatedAt:now};if(type==='task'){record.status=data.status||old?.status||'معلقة';record.startedAt=record.status==='قيد التنفيذ'?(old?.status===record.status?(old.startedAt||old.updatedAt||now):now):null}if(type==='workspace'&&!record.color)record.color='#5b8cff';
       const next={...db,[collection]:id?db[collection].map(x=>x.id===id?record:x):[record,...db[collection]]};
-      const result=await saveDatabase(next);db=next;localRevision++;cacheLocalDatabase(db,!navigator.onLine||!!result?.queued);renderAll();syncNativeTaskReminders();closeForm();toast(navigator.onLine&&!result?.queued?'تم حفظ البيانات على Google Sheets':'تم الحفظ على الجهاز وستتم المزامنة عند عودة الإنترنت');
+      const result=await saveDatabase(next);db=next;localRevision++;cacheLocalDatabase(db,!navigator.onLine||!!result?.queued);renderAll();syncNativeTaskReminders();closeForm();toast(navigator.onLine&&!result?.queued?'تم حفظ البيانات على Supabase':'تم الحفظ على الجهاز وستتم المزامنة عند عودة الإنترنت');
     }catch(err){toast('فشل الحفظ: '+err.message)}finally{submit.disabled=false;submit.textContent='حفظ البيانات'}
   });
   async function deleteItem(type,id){
     const collection=TYPE_MAP[type]||type;if(!await confirmInApp('هل تريد حذف هذا السجل نهائياً من قاعدة البيانات؟'))return;
     if(!isReady){toast('يلزم تسجيل الدخول أولاً');return}
     const next={...db,[collection]:db[collection].filter(x=>x.id!==id)};
-    try{const result=await saveDatabase(next);db=next;localRevision++;cacheLocalDatabase(db,!navigator.onLine||!!result?.queued);renderAll();syncNativeTaskReminders();toast(navigator.onLine&&!result?.queued?'تم حذف السجل من Google Sheets':'تم الحذف محلياً وستتم المزامنة عند عودة الإنترنت')}catch(err){toast('فشل الحذف: '+err.message)}
+    try{const result=await saveDatabase(next);db=next;localRevision++;cacheLocalDatabase(db,!navigator.onLine||!!result?.queued);renderAll();syncNativeTaskReminders();toast(navigator.onLine&&!result?.queued?'تم حذف السجل من Supabase':'تم الحذف محلياً وستتم المزامنة عند عودة الإنترنت')}catch(err){toast('فشل الحذف: '+err.message)}
   }
   async function changeTaskStatus(id,status,button){
     if(!isReady){toast('يلزم تسجيل الدخول أولاً');return}
@@ -174,8 +176,8 @@
     const key=guarded.includes(payload.action)?payload.action+':'+String(payload.assignmentId||payload.requestId||'global'):'';
     if(key&&assignmentRequestsInFlight.has(key))throw new Error('operation_in_progress');
     const request=(async()=>{
-    const response=await fetch(API_URL,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...payload,token:authToken})});
-    const raw=await response.text();let result;try{result=JSON.parse(raw)}catch{throw new Error('لم تصل استجابة صالحة من Google Apps Script؛ تحقق من نشر Web App')}
+    const response=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_PUBLISHABLE_KEY,'x-smartnote-session':authToken},body:JSON.stringify({...payload,token:authToken})});
+    const raw=await response.text();let result;try{result=JSON.parse(raw)}catch{throw new Error('لم تصل استجابة صالحة من Supabase؛ تحقق من إعداد Edge Function')}
     if(result.error)throw new Error(result.error);if(result.ok===false)throw new Error('تعذر تنفيذ العملية');return result;
     })();
     if(key)assignmentRequestsInFlight.set(key,request);
@@ -225,7 +227,7 @@
       const dismissed=new Set([...(db.taskNotificationDismissals||[]),...(remote.taskNotificationDismissals||[])]);remote.taskNotificationDismissals=[...dismissed];
       if(JSON.stringify(cloudPayload(remote))!==JSON.stringify(cloudPayload(db))){db=remote;cacheLocalDatabase(db,false);renderAll();syncNativeTaskReminders()}
       const removed=taskAlerts.filter(alert=>dismissed.has(alert.key));if(removed.length){removed.forEach(alert=>closeBrowserNotification(alert.key));for(let i=taskAlerts.length-1;i>=0;i--)if(dismissed.has(taskAlerts[i].key))taskAlerts.splice(i,1);persistTaskAlertState();renderTaskAlerts()}
-      setConnection(true,'مزامنة تلقائية كل 5 ثوانٍ.');
+      setConnection(true,'مزامنة تلقائية مع Supabase.');
     }catch(err){setConnection(false,'تعذر تحديث البيانات: '+err.message)}
     finally{syncInFlight=false}
   }
@@ -248,12 +250,12 @@
     gate.style.display='flex';document.getElementById('loginError').textContent=message;
   }
   async function afterLogin(preloadedData,preloadedRevision){
-    if(currentUser?.mustChangePassword){const oldPassword=prompt(document.documentElement.lang==='en'?'Temporary password:':'أدخل كلمة المرور المؤقتة:');const newPassword=prompt(document.documentElement.lang==='en'?'Choose a new password (at least 10 characters):':'اختر كلمة مرور جديدة (10 أحرف على الأقل):');if(!oldPassword||!newPassword||newPassword.length<10){authToken='';currentUser=null;localStorage.removeItem(SESSION_KEY);showLogin(document.documentElement.lang==='en'?'Password change is required to continue.':'يجب تغيير كلمة المرور للمتابعة.');return}try{await apiPost({action:'change_password',oldPassword,newPassword});currentUser.mustChangePassword=false;localStorage.setItem(SESSION_KEY,JSON.stringify({token:authToken,user:currentUser}));toast(document.documentElement.lang==='en'?'Password updated.':'تم تغيير كلمة المرور بنجاح')}catch(error){authToken='';currentUser=null;localStorage.removeItem(SESSION_KEY);showLogin(document.documentElement.lang==='en'?'Could not change password. Sign in again.':'تعذر تغيير كلمة المرور. سجل الدخول مرة أخرى.');return}}
+    if(currentUser?.mustChangePassword){const oldPassword=prompt(document.documentElement.lang==='en'?'Temporary password:':'أدخل كلمة المرور المؤقتة:');const newPassword=prompt(document.documentElement.lang==='en'?'Choose a new password (at least 10 characters):':'اختر كلمة مرور جديدة (10 أحرف على الأقل):');if(!oldPassword||!newPassword||newPassword.length<10){authToken='';currentUser=null;localStorage.removeItem(SESSION_KEY);showLogin(document.documentElement.lang==='en'?'Password change is required to continue.':'يجب تغيير كلمة المرور للمتابعة.');return}try{await apiPost({action:'change_password',currentPassword:oldPassword,newPassword});currentUser.mustChangePassword=false;localStorage.setItem(SESSION_KEY,JSON.stringify({token:authToken,user:currentUser}));toast(document.documentElement.lang==='en'?'Password updated.':'تم تغيير كلمة المرور بنجاح')}catch(error){authToken='';currentUser=null;localStorage.removeItem(SESSION_KEY);showLogin(document.documentElement.lang==='en'?'Could not change password. Sign in again.':'تعذر تغيير كلمة المرور. سجل الدخول مرة أخرى.');return}}
     const result=preloadedData&&typeof preloadedData==='object'?{data:preloadedData,revision:preloadedRevision}:await apiPost({action:'load'});cloudRevision=Number(result.revision??preloadedRevision??0)||0;db=normalizeDatabase(result.data||{});isReady=true;localRevision=0;cacheLocalDatabase(db,hasPendingSync());renderAll();syncNativeTaskReminders();
     const pendingTaskId=new URLSearchParams(window.location.search).get('openTask');
     if(pendingTaskId){if(get('tasks',pendingTaskId)){showView('tasks');openForm('task',pendingTaskId)}const cleanUrl=new URL(window.location.href);cleanUrl.searchParams.delete('openTask');window.history.replaceState({},'',cleanUrl.toString())}
     requestNotificationPermissionOnStartup();// Login gate is created only for manual login; keep automatic session restore safe.
-    document.getElementById('loginGate')?.style.setProperty('display','none');hideGate();setConnection(true,'تم تسجيل الدخول؛ المزامنة كل 5 ثوانٍ.');
+    document.getElementById('loginGate')?.style.setProperty('display','none');hideGate();setConnection(true,'تم تسجيل الدخول والمزامنة مع Supabase.');
     const welcome=document.getElementById('welcomeUser');if(welcome){welcome.hidden=false;welcome.textContent=(document.documentElement.lang==='en'?'Welcome, ':'مرحباً، ')+(currentUser?.username||'')}
     if(currentUser?.role==='admin') addAdminButton();
     document.getElementById('assignedCreateButton')?.addEventListener('click',createAssignedFollowup);loadAssignedView();
