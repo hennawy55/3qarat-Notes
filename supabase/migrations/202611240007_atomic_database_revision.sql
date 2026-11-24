@@ -6,7 +6,6 @@ create table if not exists public.user_database_meta (
   updated_at timestamptz not null default now()
 );
 alter table public.user_database_meta enable row level security;
-drop function if exists public.replace_smartnote_database(uuid,jsonb);
 revoke all on public.user_database_meta from public, anon, authenticated;
 drop function if exists public.replace_smartnote_database(uuid,jsonb);
 create or replace function public.replace_smartnote_database(p_user_id uuid, p_data jsonb, p_expected_revision bigint default null)
