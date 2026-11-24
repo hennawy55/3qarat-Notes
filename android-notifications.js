@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { PushNotifications } from '@capacitor/push-notifications';
 import { StatusBar, Style } from '@capacitor/status-bar';
 
 const isNative = Capacitor.isNativePlatform();
@@ -68,6 +69,11 @@ if (isNative) {
     async requestPermission() {
       const granted = await hasPermission(true);
       if (granted) await ensureChannel();
+      try {
+        let push = await PushNotifications.checkPermissions();
+        if (push.receive !== 'granted') push = await PushNotifications.requestPermissions();
+        if (push.receive === 'granted') await PushNotifications.register();
+      } catch (error) { console.warn('FCM registration permission:', error); }
       return granted;
     },
 
@@ -152,6 +158,19 @@ if (isNative) {
       }
     }
   };
+
+  PushNotifications.addListener('registration', token => {
+    try { localStorage.setItem('smartnote_fcm_token', token.value); } catch {}
+    window.dispatchEvent(new CustomEvent('smartnote-fcm-token', { detail: { token: token.value } }));
+  });
+  PushNotifications.addListener('registrationError', error => console.warn('FCM registration error:', error));
+  PushNotifications.addListener('pushNotificationReceived', notification => {
+    window.dispatchEvent(new CustomEvent('smartnote-push-received', { detail: notification }));
+  });
+  PushNotifications.addListener('pushNotificationActionPerformed', event => {
+    const assignmentId = event.notification?.data?.assignmentId;
+    if (typeof assignmentId === 'string' && assignmentId) window.dispatchEvent(new CustomEvent('smartnote-open-assignment', { detail: { assignmentId } }));
+  });
 
   LocalNotifications.addListener('localNotificationActionPerformed', event => {
     const extra = event.notification?.extra || {};
