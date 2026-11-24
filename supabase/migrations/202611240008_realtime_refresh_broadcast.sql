@@ -89,34 +89,6 @@ $$;
 
 revoke all on function public.smartnote_realtime_broadcast() from public, anon, authenticated;
 
-drop trigger if exists smartnote_realtime_workspaces on public.workspaces;
-create trigger smartnote_realtime_workspaces after insert or update or delete on public.workspaces
-for each row execute function public.smartnote_realtime_broadcast();
-
-drop trigger if exists smartnote_realtime_projects on public.projects;
-create trigger smartnote_realtime_projects after insert or update or delete on public.projects
-for each row execute function public.smartnote_realtime_broadcast();
-
-drop trigger if exists smartnote_realtime_units on public.units;
-create trigger smartnote_realtime_units after insert or update or delete on public.units
-for each row execute function public.smartnote_realtime_broadcast();
-
-drop trigger if exists smartnote_realtime_notes on public.notes;
-create trigger smartnote_realtime_notes after insert or update or delete on public.notes
-for each row execute function public.smartnote_realtime_broadcast();
-
-drop trigger if exists smartnote_realtime_clients on public.clients;
-create trigger smartnote_realtime_clients after insert or update or delete on public.clients
-for each row execute function public.smartnote_realtime_broadcast();
-
-drop trigger if exists smartnote_realtime_tasks on public.tasks;
-create trigger smartnote_realtime_tasks after insert or update or delete on public.tasks
-for each row execute function public.smartnote_realtime_broadcast();
-
-drop trigger if exists smartnote_realtime_task_dismissals on public.task_notification_dismissals;
-create trigger smartnote_realtime_task_dismissals after insert or update or delete on public.task_notification_dismissals
-for each row execute function public.smartnote_realtime_broadcast();
-
 drop trigger if exists smartnote_realtime_assignments on public.assignments;
 create trigger smartnote_realtime_assignments after insert or update or delete on public.assignments
 for each row execute function public.smartnote_realtime_broadcast();
@@ -139,4 +111,9 @@ for each row execute function public.smartnote_realtime_broadcast();
 
 drop trigger if exists smartnote_realtime_profiles on public.profiles;
 create trigger smartnote_realtime_profiles after insert or update or delete on public.profiles
+for each row execute function public.smartnote_realtime_broadcast();
+
+-- The notebook is replaced atomically; one metadata update is enough to notify all sessions.
+drop trigger if exists smartnote_realtime_database_meta on public.user_database_meta;
+create trigger smartnote_realtime_database_meta after insert or update on public.user_database_meta
 for each row execute function public.smartnote_realtime_broadcast();
