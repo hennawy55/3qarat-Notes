@@ -67,18 +67,38 @@ if (isNative) {
     },
 
     async registerForPushNotifications() {
+      const diagnostic = { stage: 'permission_check', at: new Date().toISOString() };
+      const saveDiagnostic = value => {
+        try { localStorage.setItem('smartnote_fcm_diagnostics', JSON.stringify(value)); } catch {}
+      };
       try {
         let push = await PushNotifications.checkPermissions();
-        if (push.receive !== 'granted') push = await PushNotifications.requestPermissions();
-        if (push.receive !== 'granted') return false;
+        diagnostic.permissionBefore = push?.receive || 'unknown';
+        if (push.receive !== 'granted') {
+          diagnostic.stage = 'permission_request';
+          push = await PushNotifications.requestPermissions();
+        }
+        diagnostic.permissionAfter = push?.receive || 'unknown';
+        if (push.receive !== 'granted') {
+          diagnostic.stage = 'permission_denied';
+          saveDiagnostic(diagnostic);
+          window.dispatchEvent(new CustomEvent('smartnote-fcm-diagnostic', { detail: diagnostic }));
+          return false;
+        }
+        diagnostic.stage = 'register_called';
+        saveDiagnostic(diagnostic);
         await PushNotifications.register();
+        // The registration event is asynchronous; do not interpret register() resolution as a token.
         return true;
       } catch (error) {
-        console.warn('FCM registration permission:', error);
+        diagnostic.stage = 'register_exception';
+        diagnostic.error = String(error?.message || error);
+        saveDiagnostic(diagnostic);
+        console.error('[SmartNote FCM] register() failed:', error);
+        window.dispatchEvent(new CustomEvent('smartnote-fcm-diagnostic', { detail: diagnostic }));
         return false;
       }
     },
-
     async requestPermission() {
       const granted = await hasPermission(true);
       if (granted) await ensureChannel();
@@ -169,10 +189,20 @@ if (isNative) {
   };
 
   PushNotifications.addListener('registration', token => {
-    try { localStorage.setItem('smartnote_fcm_token', token.value); } catch {}
+    const diagnostic = { stage: 'token_received', tokenLength: String(token?.value || '').length, at: new Date().toISOString() };
+    try {
+      localStorage.setItem('smartnote_fcm_token', token.value);
+      localStorage.setItem('smartnote_fcm_diagnostics', JSON.stringify(diagnostic));
+    } catch {}
+    console.info('[SmartNote FCM] Token received; length:', diagnostic.tokenLength);
     window.dispatchEvent(new CustomEvent('smartnote-fcm-token', { detail: { token: token.value } }));
   });
-  PushNotifications.addListener('registrationError', error => console.warn('FCM registration error:', error));
+  PushNotifications.addListener('registrationError', error => {
+    const diagnostic = { stage: 'registration_error', error: String(error?.error || error?.message || JSON.stringify(error)), at: new Date().toISOString() };
+    try { localStorage.setItem('smartnote_fcm_diagnostics', JSON.stringify(diagnostic)); } catch {}
+    console.error('[SmartNote FCM] registrationError:', error);
+    window.dispatchEvent(new CustomEvent('smartnote-fcm-diagnostic', { detail: diagnostic }));
+  });
   PushNotifications.addListener('pushNotificationReceived', notification => {
     window.dispatchEvent(new CustomEvent('smartnote-push-received', { detail: notification }));
   });
