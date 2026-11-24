@@ -274,10 +274,14 @@
     }
     try{
       const result=await apiPost({action:'push_register',fcmToken,platform:'android'});
-      const status={ok:true,stage:'saved_in_supabase',registered:!!result.registered,at:new Date().toISOString()};
-      console.info('[SmartNote FCM] Token saved in Supabase:',status.registered);
+      if(!result.registered)throw new Error('Supabase did not confirm device registration');
+      const status={ok:true,stage:'saved_in_supabase',registered:true,deviceId:result.deviceId||'',at:new Date().toISOString()};
+      console.info('[SmartNote FCM] Device row confirmed by Supabase:',status.deviceId);
       try{localStorage.setItem('smartnote_fcm_sync_status',JSON.stringify(status))}catch{}
       window.dispatchEvent(new CustomEvent('smartnote-fcm-sync-result',{detail:status}));
+      const test=await apiPost({action:'push_test'});
+      console.info('[SmartNote FCM] Test push result:',test);
+      toast(test.sent>0?'تم إرسال إشعار اختبار إلى هاتفك':('تم تسجيل الجهاز لكن فشل إرسال إشعار الاختبار: '+String(test.reason||test.failed||'تحقق من إعداد Firebase')));
     }catch(error){
       const status={ok:false,stage:'supabase_save_failed',error:String(error?.message||error),at:new Date().toISOString()};
       console.error('[SmartNote FCM] Supabase token save failed:',error);
