@@ -73,7 +73,12 @@ jobs:
         run: |
           MAIN_ACTIVITY="$(find android/app/src/main/java -type f -name MainActivity.java -print -quit)"
           if [ -z "$MAIN_ACTIVITY" ]; then echo "Capacitor MainActivity.java was not generated"; exit 1; fi
-          PACKAGE_NAME="$(sed -n 's/^package \\(.*\\);/\\1/p' "$MAIN_ACTIVITY" | head -n 1)"
+          PACKAGE_NAME="$(awk '/^[[:space:]]*package[[:space:]]/ { gsub(/;/, "", $2); print $2; exit }' "$MAIN_ACTIVITY")"
+          if [ -z "$PACKAGE_NAME" ]; then
+            PACKAGE_DIR="${MAIN_ACTIVITY#android/app/src/main/java/}"
+            PACKAGE_NAME="${PACKAGE_DIR%/MainActivity.java}"
+            PACKAGE_NAME="${PACKAGE_NAME//\//.}"
+          fi
           if [ -z "$PACKAGE_NAME" ]; then echo "Could not detect MainActivity package"; exit 1; fi
           cat > "$MAIN_ACTIVITY" <<JAVA
           package ${PACKAGE_NAME};
