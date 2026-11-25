@@ -7,6 +7,7 @@ on:
     paths:
       - 'index.html'
       - 'app.js'
+      - 'app.ar.js'
       - 'styles.css'
       - 'theme.js'
       - 'language.js'
