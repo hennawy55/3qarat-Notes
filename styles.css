@@ -499,3 +499,6 @@ html[dir="ltr"] .admin-password-row{direction:ltr}
  .unified-notice-head{grid-template-columns:minmax(0,1fr) auto auto;gap:6px}
  .notice-action-btn{width:27px;height:27px}
 }
+
+.assignment-note-date{margin-inline-start:auto;color:var(--muted);font-size:.78rem;white-space:nowrap}
+#assignedHeaderCreateButton{white-space:nowrap}
