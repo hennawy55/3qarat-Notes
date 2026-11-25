@@ -1,7 +1,8 @@
-const CACHE = 'smartnote-offline-shell-v29';
+const CACHE = 'smartnote-offline-shell-v30';
 const ASSETS = [
   './index.html',
   './index-en.html',
+  './index-ar.html',
   './app.en.js',
   './styles.css',
   './app.js',
