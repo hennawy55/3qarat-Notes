@@ -1,5 +1,6 @@
 (() => {
   'use strict';
+  window.appTranslate=value=>String(value??'');
   const SUPABASE_URL='https://cantyrqkkbqwrajghluw.supabase.co';
   const SUPABASE_PUBLISHABLE_KEY='sb_publishable_PdO0cP98yMMPHLUrJAES0A_b9Z4JlpY';
   const API_URL=SUPABASE_URL+'/functions/v1/smartnote-auth';
