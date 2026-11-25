@@ -44,7 +44,7 @@ const languageSwitcher = read('language.js');
 assert(englishHtml.includes('<html lang="en" dir="ltr">') && englishHtml.includes('./app.en.js'), 'English page must be a standalone LTR app entry');
 assert(!englishHtml.includes('>الرئيسية<') && !englishHtml.includes('>المتابعات<'), 'English static page must not contain Arabic navigation labels');
 assert(englishApp.includes('window.appTranslate=value=>') && !englishApp.includes('MutationObserver'), 'English app must use explicit English enum labels without DOM translation observers');
-assert(languageSwitcher.includes('index-en.html') && !languageSwitcher.includes('MutationObserver'), 'Language switch must navigate between independent pages');
+assert(languageSwitcher.includes('index-ar.html') && !languageSwitcher.includes('MutationObserver'), 'Language switch must navigate between independent pages');
 assert(packageJson.scripts['prepare:android'].includes('index-en.html') && packageJson.scripts['prepare:web'].includes('app.en.js'), 'Both language builds must be included in distributables');
 
 const arabicHtml = read('index-ar.html');
