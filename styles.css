@@ -502,3 +502,26 @@ html[dir="ltr"] .admin-password-row{direction:ltr}
 
 .assignment-note-date{margin-inline-start:auto;color:var(--muted);font-size:.78rem;white-space:nowrap}
 #assignedHeaderCreateButton{white-space:nowrap}
+
+/* English layout: mirror the RTL-specific alignments and control placement. */
+html[dir="ltr"]{direction:ltr;text-align:left}
+html[dir="ltr"] body,html[dir="ltr"] .app,html[dir="ltr"] .main,html[dir="ltr"] .view,html[dir="ltr"] .panel,html[dir="ltr"] .card,html[dir="ltr"] .entity-card,html[dir="ltr"] .modal,html[dir="ltr"] .form-grid,html[dir="ltr"] .field{direction:ltr;text-align:left}
+html[dir="ltr"] .sidebar{border-left:0;border-right:1px solid var(--line)}
+html[dir="ltr"] .nav button,html[dir="ltr"] .space-link{text-align:left}
+html[dir="ltr"] .nav button.active{box-shadow:inset 3px 0 var(--blue)}
+html[dir="ltr"] .topbar:before{right:auto;left:0;border-radius:5px 0 0 5px}
+html[dir="ltr"] .search span{right:auto;left:12px}
+html[dir="ltr"] .search input{padding-right:12px;padding-left:36px;text-align:left}
+html[dir="ltr"] .task-group summary:after{margin-right:0;margin-left:auto}
+html[dir="ltr"] .notification-panel{left:0;right:auto}
+html[dir="ltr"] .notification-count{right:auto;left:-5px}
+html[dir="ltr"] .login-card,html[dir="ltr"] .admin-shell,html[dir="ltr"] .login-brand,html[dir="ltr"] .login-form,html[dir="ltr"] .login-field,html[dir="ltr"] .admin-header,html[dir="ltr"] .admin-create-form,html[dir="ltr"] .admin-user-card,html[dir="ltr"] .admin-user-controls{direction:ltr;text-align:left}
+html[dir="ltr"] .login-input-wrap,html[dir="ltr"] .login-input-wrap input{direction:ltr;text-align:left}
+html[dir="ltr"] .admin-create-form label,html[dir="ltr"] .admin-user-controls label{text-align:left}
+html[dir="ltr"] .admin-password-row{direction:ltr}
+html[dir="ltr"] .toast{left:auto;right:22px}
+html[dir="ltr"] .detail-color{direction:ltr}
+html[dir="ltr"] .notice-time{text-align:start}
+html[dir="ltr"] .task-alert::before{right:auto;left:0}
+html[dir="ltr"] .mobile-nav{direction:ltr}
+@media(max-width:700px){html[dir="ltr"] .notification-panel{left:10px;right:10px}html[dir="ltr"] .toast{left:12px;right:12px}html[dir="ltr"] .sidebar{left:0;right:auto;border-right:1px solid var(--line)}}
