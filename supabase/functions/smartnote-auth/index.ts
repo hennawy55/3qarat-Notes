@@ -132,9 +132,7 @@ function localizedNotification(type:string,title:string,body:string,language:str
  else if(type==="reassigned")nextBody=body.replace(" — تم إسنادها إلى "," — It has been reassigned to ");
  else if(type==="reassignment_result"){
   if(body==="تم تغيير المسؤول قبل مراجعة الطلب.")nextBody="The assignee changed before the request was reviewed.";
-  else if(body.startsWith("طلب إعادة إسناد المتابعة "))nextBody=body.replace("طلب إعادة إسناد المتابعة ","Reassignment request for follow-up ").replace(" إلى المستخدم "," to user ").replace(" تم قبوله"," was approved").replace(" تم رفضه"," was rejected");
-  else if(body.includes("تمت الموافقة"))nextBody="The reassignment request was approved.";
-  else if(body.includes("تم رفض"))nextBody="The reassignment request was rejected.";
+  else {const match=body.match(/^طلب إعادة إسناد المتابعة (.+) إلى المستخدم (.+) (تم قبوله|تم رفضه)$/);if(match)nextBody=`Reassignment request for follow-up ${match[1]} to user ${match[2]} was ${match[3]==="تم قبوله"?"approved":"rejected"}`;else if(body.includes("تمت الموافقة"))nextBody="The reassignment request was approved.";else if(body.includes("تم رفض"))nextBody="The reassignment request was rejected.";}
  }
  return {title:titleMap[type]||title,body:nextBody};
 }
