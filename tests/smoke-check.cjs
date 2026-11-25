@@ -25,7 +25,7 @@ assert(edge.includes('p_expected_revision') && edge.includes('revision:Number(me
 assert(migrationAuth.includes('drop constraint if exists profiles_id_fkey'), 'Custom login identities must not require Supabase Auth users');
 assert(migrationDb.includes('user_database_meta') && migrationDb.includes("raise exception 'data_conflict'"), 'Database replacement must guard against cross-device stale writes');
 assert(html.includes('./lucide.min.js') && !html.includes('lucide@latest'), 'Lucide must be loaded from a local pinned asset');
-assert(worker.includes('smartnote-offline-shell-v29') && worker.includes('./lucide.min.js'), 'Service worker must cache refreshed Lucide asset');
+assert(worker.includes('smartnote-offline-shell-v30') && worker.includes('./lucide.min.js'), 'Service worker must cache refreshed Lucide asset');
 assert(packageJson.dependencies.lucide === '0.468.0', 'Lucide version must remain pinned');
 assert(packageJson.scripts['prepare:android'].includes('node_modules/lucide/dist/umd/lucide.min.js'), 'Android build must bundle the local Lucide runtime');
 assert(packageJson.scripts['prepare:web'].includes('node_modules/lucide/dist/umd/lucide.min.js'), 'Web build must bundle the local Lucide runtime');
@@ -46,3 +46,10 @@ assert(!englishHtml.includes('>الرئيسية<') && !englishHtml.includes('>ا
 assert(englishApp.includes('window.appTranslate=value=>') && !englishApp.includes('MutationObserver'), 'English app must use explicit English enum labels without DOM translation observers');
 assert(languageSwitcher.includes('index-en.html') && !languageSwitcher.includes('MutationObserver'), 'Language switch must navigate between independent pages');
 assert(packageJson.scripts['prepare:android'].includes('index-en.html') && packageJson.scripts['prepare:web'].includes('app.en.js'), 'Both language builds must be included in distributables');
+
+const arabicHtml = read('index-ar.html');
+assert(html.includes('<html lang="en" dir="ltr">') && html.includes('./app.en.js'), 'Root page must launch the standalone English app by default');
+assert(arabicHtml.includes('<html lang="ar" dir="rtl">') && arabicHtml.includes('./app.js'), 'Arabic page must remain a standalone RTL app');
+assert(languageSwitcher.includes('index-ar.html') && languageSwitcher.includes("location.href=arabic?'./index.html':'./index-ar.html'"), 'Language switch must work in both directions');
+assert(styles.includes('html[dir="ltr"] .nav button') && styles.includes('html[dir="ltr"] .toast'), 'English layout must explicitly mirror RTL-specific component alignment');
+assert(packageJson.scripts['prepare:android'].includes('index-ar.html') && packageJson.scripts['prepare:web'].includes('index-ar.html'), 'Both language entries must be included in distributables');
