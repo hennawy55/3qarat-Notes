@@ -4,6 +4,7 @@ import { PushNotifications } from '@capacitor/push-notifications';
 import { StatusBar, Style } from '@capacitor/status-bar';
 
 const isNative = Capacitor.isNativePlatform();
+const isEnglish = (() => { try { return localStorage.getItem('aqarLanguage') === 'en'; } catch { return false; } })();
 let channelReady = false;
 let lastScheduleSignature = '';
 
@@ -29,8 +30,8 @@ async function ensureChannel() {
   try {
     await LocalNotifications.createChannel({
       id: 'smartnote-reminders',
-      name: 'تذكيرات SmartNote',
-      description: 'تنبيهات مواعيد المتابعات',
+      name: isEnglish ? 'SmartNote reminders' : 'تذكيرات SmartNote',
+      description: isEnglish ? 'Follow-up due date alerts' : 'تنبيهات مواعيد المتابعات',
       importance: 5,
       visibility: 1,
       sound: 'default'
@@ -113,7 +114,7 @@ if (isNative) {
       await LocalNotifications.schedule({
         notifications: [{
           id: notificationIdNumber,
-          title: String(title || 'إشعار جديد').slice(0, 120),
+          title: String(title || (isEnglish ? 'New notification' : 'إشعار جديد')).slice(0, 120),
           body: String(body || '').slice(0, 500),
           schedule: { at: new Date(Date.now() + 1000) },
           channelId: 'smartnote-reminders',
@@ -137,8 +138,8 @@ if (isNative) {
           if (dueAt && dueAt.getTime() > now + 5000 && task.status !== 'قيد التنفيذ') {
             desired.push({
               id: stableId(task.id + ':due'),
-              title: 'موعد متابعة مستحق',
-              body: 'حان موعد المتابعة: ' + (task.title || 'متابعة جديدة'),
+              title: isEnglish ? 'Follow-up due' : 'موعد متابعة مستحق',
+              body: (isEnglish ? 'Follow-up due: ' : 'حان موعد المتابعة: ') + (task.title || (isEnglish ? 'New follow-up' : 'متابعة جديدة')),
               schedule: { at: dueAt },
               channelId: 'smartnote-reminders',
               extra: { smartNoteReminder: true, taskId: task.id, kind: 'due', key: task.id + ':due:' + dueAt.getTime() }
@@ -152,8 +153,8 @@ if (isNative) {
           if (!Number.isNaN(reminderAt.getTime()) && reminderAt.getTime() > now + 5000) {
             desired.push({
               id: stableId(task.id + ':in_progress'),
-              title: 'تذكير بمتابعة قيد التنفيذ',
-              body: 'مرّت ساعة على بدء: ' + (task.title || 'متابعة'),
+              title: isEnglish ? 'In-progress follow-up reminder' : 'تذكير بمتابعة قيد التنفيذ',
+              body: (isEnglish ? 'One hour since starting: ' : 'مرّت ساعة على بدء: ') + (task.title || (isEnglish ? 'Follow-up' : 'متابعة')),
               schedule: { at: reminderAt },
               channelId: 'smartnote-reminders',
               smallIcon: 'ic_launcher',

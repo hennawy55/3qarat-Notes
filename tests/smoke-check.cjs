@@ -25,7 +25,7 @@ assert(edge.includes('p_expected_revision') && edge.includes('revision:Number(me
 assert(migrationAuth.includes('drop constraint if exists profiles_id_fkey'), 'Custom login identities must not require Supabase Auth users');
 assert(migrationDb.includes('user_database_meta') && migrationDb.includes("raise exception 'data_conflict'"), 'Database replacement must guard against cross-device stale writes');
 assert(html.includes('./lucide.min.js') && !html.includes('lucide@latest'), 'Lucide must be loaded from a local pinned asset');
-assert(worker.includes('smartnote-offline-shell-v28') && worker.includes('./lucide.min.js'), 'Service worker must cache refreshed Lucide asset');
+assert(worker.includes('smartnote-offline-shell-v29') && worker.includes('./lucide.min.js'), 'Service worker must cache refreshed Lucide asset');
 assert(packageJson.dependencies.lucide === '0.468.0', 'Lucide version must remain pinned');
 assert(packageJson.scripts['prepare:android'].includes('node_modules/lucide/dist/umd/lucide.min.js'), 'Android build must bundle the local Lucide runtime');
 assert(packageJson.scripts['prepare:web'].includes('node_modules/lucide/dist/umd/lucide.min.js'), 'Web build must bundle the local Lucide runtime');
@@ -37,3 +37,12 @@ assert(migrationRealtime.includes('realtime.send') && migrationRealtime.includes
 assert(styles.includes('.task-alert.is-unread') && styles.includes('.notification-panel'), 'Notification panel must use compact unread-aware card styling');
 assert(nativeNotifications.includes('showInstantNotification') && nativeNotifications.includes('smartnote-open-assignment'), 'Android must support immediate incoming notification display');
 console.log('SmartNote Supabase migration smoke checks passed.');
+
+const englishHtml = read('index-en.html');
+const englishApp = read('app.en.js');
+const languageSwitcher = read('language.js');
+assert(englishHtml.includes('<html lang="en" dir="ltr">') && englishHtml.includes('./app.en.js'), 'English page must be a standalone LTR app entry');
+assert(!englishHtml.includes('>الرئيسية<') && !englishHtml.includes('>المتابعات<'), 'English static page must not contain Arabic navigation labels');
+assert(englishApp.includes('window.appTranslate=value=>') && !englishApp.includes('MutationObserver'), 'English app must use explicit English enum labels without DOM translation observers');
+assert(languageSwitcher.includes('index-en.html') && !languageSwitcher.includes('MutationObserver'), 'Language switch must navigate between independent pages');
+assert(packageJson.scripts['prepare:android'].includes('index-en.html') && packageJson.scripts['prepare:web'].includes('app.en.js'), 'Both language builds must be included in distributables');

@@ -6,6 +6,8 @@ on:
     branches: [main, supabase-migration]
     paths:
       - 'app.js'
+      - 'app.en.js'
+      - 'index-en.html'
       - 'language.js'
       - 'index.html'
       - 'styles.css'

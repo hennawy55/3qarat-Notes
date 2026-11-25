@@ -1,6 +1,8 @@
-const CACHE = 'smartnote-offline-shell-v28';
+const CACHE = 'smartnote-offline-shell-v29';
 const ASSETS = [
   './index.html',
+  './index-en.html',
+  './app.en.js',
   './styles.css',
   './app.js',
   './theme.js',
@@ -40,7 +42,7 @@ self.addEventListener('fetch', event => {
         const response = await fetch(request);
         if (response && response.ok) {
           const cache = await caches.open(CACHE);
-          await cache.put('./index.html', response.clone());
+          await cache.put(request, response.clone());
         }
         return response;
       } catch {
