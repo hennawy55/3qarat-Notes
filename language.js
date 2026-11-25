@@ -1,5 +1,5 @@
 (()=>{'use strict';
-  const isArabic=()=>document.documentElement.lang.toLowerCase()==='ar'||/(?:^|\\/)index-ar\\.html$/i.test(window.location.pathname);
+  const isArabic=()=>String(document.documentElement.lang||'').toLowerCase()==='ar';
   const setButtonLabel=()=>{
     const button=document.getElementById('languageToggle');
     if(!button)return;
@@ -13,10 +13,9 @@
     const arabic=isArabic();
     const current=new URL(window.location.href);
     const path=current.pathname;
-    let base;
-    if(/\\/index(?:-ar|-en)?\\.html$/i.test(path))base=path.replace(/index(?:-ar|-en)?\\.html$/i,'');
-    else if(path.endsWith('/'))base=path;
-    else base=path.slice(0,path.lastIndexOf('/')+1)||'/';
+    const lowerPath=path.toLowerCase();
+    const isKnownPage=['/index.html','/index-en.html','/index-ar.html'].some(name=>lowerPath.endsWith(name))||['index.html','index-en.html','index-ar.html'].includes(lowerPath);
+    const base=isKnownPage?path.slice(0,path.lastIndexOf('/')+1):(path.endsWith('/')?path:path.slice(0,path.lastIndexOf('/')+1)||'/');
     const target=new URL(base+(arabic?'index.html':'index-ar.html'),current.origin);
     target.search=current.search;
     target.hash=current.hash;
@@ -34,7 +33,6 @@
   };
   const bind=()=>{
     setButtonLabel();
-    // Delegation in capture phase keeps the switch reliable even if app code rebinds UI handlers.
     document.addEventListener('click',event=>{
       const button=event.target.closest?.('#languageToggle');
       if(!button)return;
