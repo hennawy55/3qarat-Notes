@@ -697,5 +697,3 @@
   if('serviceWorker'in navigator&&window.isSecureContext)navigator.serviceWorker.register('./sw.js').then(registration=>{serviceWorkerRegistration=registration}).catch(err=>toast('Could not set up phone notifications: '+err.message));
   if(window.lucide)window.lucide.createIcons({attrs:{"stroke-width":1.8}});restoreTaskAlertState();renderAll();requestNotificationPermissionOnStartup();initializeCloud();
 })();
-
-})();
