@@ -73,7 +73,25 @@
     showView('tasks');
     openForm('task',alert.taskId);
   }
-  async function sendSystemTaskNotification(alert){if(!window.smartNoteNativeNotifications?.isNative)return;}
+  async function sendSystemTaskNotification(alert){
+    const options={id:alert.key,title:alert.title||assignmentText('تذكير بمتابعة','Follow-up reminder'),body:alert.body||'',taskId:alert.taskId,tag:alert.key};
+    try{
+      const native=window.smartNoteNativeNotifications;
+      if(native?.isNative&&typeof native.showInstantNotification==='function'){
+        await native.showInstantNotification(options);
+        return;
+      }
+      if(!('Notification'in window)||Notification.permission!=='granted')return;
+      if(serviceWorkerRegistration?.showNotification){
+        await serviceWorkerRegistration.showNotification(options.title,{body:options.body,tag:options.tag,renotify:false,data:{taskId:options.taskId}});
+        return;
+      }
+      const notification=new Notification(options.title,{body:options.body,tag:options.tag,renotify:false});
+      browserNotifications.set(alert.key,notification);
+      notification.onclick=()=>{window.focus();showAlertTask(alert.key);notification.close()};
+      notification.onclose=()=>browserNotifications.delete(alert.key);
+    }catch(error){console.warn('Could not display task notification:',error)}
+  }
   function sendTaskNotification(task,type,title,body){const key=`${task.id}:${type}:${type==='due'?taskDueTimestamp(task):task.startedAt}`;if(notifiedTaskReminders.has(key))return;notifiedTaskReminders.add(key);const titleKey=taskAlertTitleKey(task.title);taskAlerts.filter(alert=>taskAlertTitleKey(alert.taskTitle||get('tasks',alert.taskId)?.title||alert.body)===titleKey).forEach(alert=>{closeBrowserNotification(alert.key);taskAlerts.splice(taskAlerts.indexOf(alert),1)});const alert={key,taskId:task.id,title,body,taskTitle:task.title,createdAt:Date.now(),isRead:false};taskAlerts.push(alert);if(!window.smartNoteNativeNotifications?.isNative&&'Notification'in window&&Notification.permission==='granted')sendSystemTaskNotification(alert).catch(err=>toast('تعذر إرسال إشعار النظام: '+err.message));persistTaskAlertState();renderTaskAlerts();if(!document.hidden)playNotificationSound()}
   function checkTaskNotifications(){const now=Date.now();if(!isReady||false)return;for(const task of db.tasks){if(task.status==='مكتملة')continue;const due=taskDueTimestamp(task);if(task.status!=='قيد التنفيذ'&&Number.isFinite(due)&&now>=due)sendTaskNotification(task,'due','المتابعة ما زالت معلقة',`حان موعد المتابعة: ${task.title}`);if(task.status==='قيد التنفيذ'&&task.startedAt&&now-Date.parse(task.startedAt)>=60*60*1000)sendTaskNotification(task,'in_progress','هل ما زلت تعمل على المتابعة؟',`مرّت ساعة على بدء: ${task.title}. افتح المتابعة وغيّر حالتها إلى مكتملة إذا انتهيت.`)}}
   function get(type,id){return db[type]?.find(x=>x.id===id)}
@@ -149,7 +167,16 @@
     const collection=TYPE_MAP[type]||type;if(!await confirmInApp('هل تريد حذف هذا السجل نهائياً من قاعدة البيانات؟'))return;
     if(!isReady){toast('يلزم تسجيل الدخول أولاً');return}
     const next={...db,[collection]:db[collection].filter(x=>x.id!==id)};
-    try{const result=await saveDatabase(next);db=next;localRevision++;cacheLocalDatabase(db,!navigator.onLine||!!result?.queued);renderAll();syncNativeTaskReminders();toast(result?.queued?(result.error||new Error(navigator.onLine?'sync_pending':'offline_saved')):assignmentText('تم الحذف بنجاح','Deleted successfully'))}catch(err){toast('فشل الحذف: '+err.message)}
+    try{
+      const result=await saveDatabase(next);db=next;localRevision++;
+      if(collection==='tasks'){
+        for(let i=taskAlerts.length-1;i>=0;i--)if(taskAlerts[i].taskId===id){closeBrowserNotification(taskAlerts[i].key);taskAlerts.splice(i,1)}
+        for(const key of [...notifiedTaskReminders])if(key.startsWith(id+':'))notifiedTaskReminders.delete(key);
+        persistTaskAlertState();
+      }
+      cacheLocalDatabase(db,!navigator.onLine||!!result?.queued);renderAll();syncNativeTaskReminders();
+      toast(result?.queued?(result.error||new Error(navigator.onLine?'sync_pending':'offline_saved')):assignmentText('تم الحذف بنجاح','Deleted successfully'))
+    }catch(err){toast('فشل الحذف: '+err.message)}
   }
   async function changeTaskStatus(id,status,button){
     if(!isReady){toast('يلزم تسجيل الدخول أولاً');return}
