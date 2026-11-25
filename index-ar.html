@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#762236">
-  <meta name="description" content="Organize real estate projects, units, clients, notes and follow-ups.">
+  <meta name="description" content="نظّم المشاريع والوحدات والعملاء والملاحظات والمتابعات العقارية.">
   <link rel="apple-touch-icon" href="./icons/smartnote-icon.svg">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/svg+xml" href="./icons/smartnote-icon.svg">
@@ -18,7 +18,7 @@
 <body>
 <div class="app">
   <aside class="sidebar">
-    <div class="brand"><div class="brand-mark"><i data-lucide="building-2"></i></div><div class="brand-copy"><strong>دفتر العقارات</strong><small>SMART REAL ESTATE NOTEBOOK</small></div><button class="btn icon sidebar-toggle" id="sidebarToggle" type="button" aria-label="طي الشريط الجانبي" title="طي الشريط الجانبي"><i data-lucide="panel-left-close"></i></button></div>
+    <div class="brand"><div class="brand-mark"><i data-lucide="building-2"></i></div><div class="brand-copy"><strong>دفتر العقارات</strong><small>دفتر العقارات الذكي</small></div><button class="btn icon sidebar-toggle" id="sidebarToggle" type="button" aria-label="طي القائمة الجانبية" title="طي القائمة الجانبية"><i data-lucide="panel-left-close"></i></button></div>
     <div><div class="nav-label">القائمة الرئيسية</div><nav class="nav" id="sideNav">
       <button class="active" data-view="dashboard" title="الرئيسية" aria-label="الرئيسية"><span class="nav-ico"><i data-lucide="layout-dashboard"></i></span><span class="nav-text">الرئيسية</span></button>
       <button data-view="workspaces" title="مساحات العمل" aria-label="مساحات العمل"><span class="nav-ico"><i data-lucide="layers"></i></span><span class="nav-text">مساحات العمل</span></button>
@@ -30,11 +30,11 @@
       <button data-view="assigned" title="المتابعات الموجهة" aria-label="المتابعات الموجهة"><span class="nav-ico"><i data-lucide="inbox"></i></span><span class="nav-text">المتابعات الموجهة</span></button>
     </nav></div>
     <div class="side-bottom">
-      <div class="connection"><div class="connection-row"><span class="dot" id="connectionDot"></span><b id="connectionText">جاري الاتصال...</b></div><small id="connectionHint">يتم تحميل بياناتك من Supabase.</small></div>
+      <div class="connection"><div class="connection-row"><span class="dot" id="connectionDot"></span><b id="connectionText">جاري الاتصال...</b></div><small id="connectionHint">يتم تحميل بياناتك من الخادم.</small></div>
     </div>
   </aside>
   <main class="main">
-    <header class="topbar"><div class="page-title"><p class="welcome-user" id="welcomeUser" hidden></p><h1 id="pageHeading">الرئيسية</h1><p id="pageSub">ملخص سريع لكل بياناتك العقارية</p></div><div class="top-actions"><div class="notification-center"><button class="btn notification-bell" id="notificationBell" type="button" aria-label="الإشعارات" aria-expanded="false" aria-controls="notificationPanel"><span aria-hidden="true"><i data-lucide="bell"></i></span><span class="notification-count" id="notificationCount" hidden>0</span></button><section class="notification-panel" id="notificationPanel" aria-label="الإشعارات" hidden><div class="notification-panel-head"><h2>إشعارات المتابعات <span id="notificationPanelCount">(0)</span></h2><div class="notification-header-actions"><button class="btn small notification-mark-all" id="notificationMarkAll" type="button"><i data-lucide="check-check"></i><span>تحديد الجميع كمقروءة</span></button><button class="btn small danger notification-delete-all" id="notificationDeleteAll" type="button"><i data-lucide="trash-2"></i><span>حذف الكل</span></button></div></div><div class="notification-panel-list" id="taskAlerts"></div><button class="btn small notification-load-more" id="notificationLoadMore" type="button" hidden>تحميل إشعارات أقدم</button></section></div><button class="btn icon theme-toggle" id="themeToggle" type="button" aria-label="تفعيل الوضع الداكن" title="تفعيل الوضع الداكن"><i data-lucide="moon"></i></button><button class="btn language-toggle" id="languageToggle" type="button" aria-label="Switch to English" title="Switch to English">EN</button><div class="search"><span><i data-lucide="search"></i></span><input id="globalSearch" placeholder="ابحث عن مشروع أو وحدة أو ملاحظة أو عميل..."></div><button class="btn primary" id="quickAdd"><i data-lucide="plus"></i> إضافة جديدة</button><button class="btn primary" id="assignedHeaderCreateButton" type="button" hidden><i data-lucide="user-plus"></i> إسناد متابعة</button></div></header>
+    <header class="topbar"><div class="page-title"><p class="welcome-user" id="welcomeUser" hidden></p><h1 id="pageHeading">الرئيسية</h1><p id="pageSub">ملخص سريع لكل بياناتك العقارية</p></div><div class="top-actions"><div class="notification-center"><button class="btn notification-bell" id="notificationBell" type="button" aria-label="الإشعارات" aria-expanded="false" aria-controls="notificationPanel"><span aria-hidden="true"><i data-lucide="bell"></i></span><span class="notification-count" id="notificationCount" hidden>0</span></button><section class="notification-panel" id="notificationPanel" aria-label="الإشعارات" hidden><div class="notification-panel-head"><h2>إشعارات المتابعات <span id="notificationPanelCount">(0)</span></h2><div class="notification-header-actions"><button class="btn small notification-mark-all" id="notificationMarkAll" type="button"><i data-lucide="check-check"></i><span>تحديد الجميع كمقروءة</span></button><button class="btn small danger notification-delete-all" id="notificationDeleteAll" type="button"><i data-lucide="trash-2"></i><span>حذف الكل</span></button></div></div><div class="notification-panel-list" id="taskAlerts"></div><button class="btn small notification-load-more" id="notificationLoadMore" type="button" hidden>تحميل إشعارات أقدم</button></section></div><button class="btn icon theme-toggle" id="themeToggle" type="button" aria-label="تفعيل الوضع الداكن" title="تفعيل الوضع الداكن"><i data-lucide="moon"></i></button><button class="btn language-toggle" id="languageToggle" type="button" aria-label="التبديل إلى الإنجليزية" title="Switch to English">EN</button><div class="search"><span><i data-lucide="search"></i></span><input id="globalSearch" placeholder="ابحث عن مشروع أو وحدة أو ملاحظة أو عميل..."></div><button class="btn primary" id="quickAdd"><i data-lucide="plus"></i> إضافة جديدة</button><button class="btn primary" id="assignedHeaderCreateButton" type="button" hidden><i data-lucide="user-plus"></i> إسناد متابعة</button></div></header>
     <section class="view active" id="view-dashboard">
       <div class="stats">
         <div class="stat"><div class="stat-top"><span>مساحات العمل</span><span class="stat-icon"><i data-lucide="layers"></i></span></div><strong id="statSpaces">0</strong><small>مساحة منظمة</small></div>
@@ -72,6 +72,6 @@
 <div class="toast" id="toast"></div>
 <script>if(window.Capacitor&&typeof window.Capacitor.isNativePlatform==="function"&&window.Capacitor.isNativePlatform()){document.write('<script src="./native-notifications.bundle.js"><\/script>')}</script>
 <script>if(window.Capacitor&&typeof window.Capacitor.isNativePlatform==="function"&&window.Capacitor.isNativePlatform()){document.write('<script src="./native-back.bundle.js"><\/script>')}</script>
-<script src="./app.js"></script>
+<script src="./app.ar.js"></script>
 </body>
 </html>
