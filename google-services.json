@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "933109993091",
+    "firebase_url": "https://my-time-77e94-default-rtdb.firebaseio.com",
+    "project_id": "my-time-77e94",
+    "storage_bucket": "my-time-77e94.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:933109993091:android:1414b66f5ed929b4cdd5b6",
+        "android_client_info": {
+          "package_name": "com.hennawy55.smartnoteupgrade"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBbiMieTgCh41Z5l2mHWJ686HulWDQrIAo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

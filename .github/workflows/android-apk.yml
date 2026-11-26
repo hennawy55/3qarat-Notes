@@ -1,10 +1,24 @@
-name: Build Android APK
+name: Build Android APK and Web
+# Rebuild trigger: regenerate both distributable artifacts without changing app source.
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, supabase-migration]
     paths:
-      - 'upgrade version/**'
+      - 'app.js'
+      - 'app.ar.js'
+      - 'app.en.js'
+      - 'index-en.html'
+      - 'index-ar.html'
+      - 'language.js'
+      - 'index.html'
+      - 'styles.css'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'android-*.js'
+      - 'supabase/**'
+      - 'tests/**'
+      - '.github/workflows/android-apk.yml'
 
 jobs:
   build:
@@ -12,9 +26,6 @@ jobs:
     env:
       ANDROID_HOME: /usr/local/lib/android/sdk
       ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
-    defaults:
-      run:
-        working-directory: upgrade version
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -38,26 +49,26 @@ jobs:
       - name: Validate source syntax and smoke tests
         run: |
           node --check app.js
-          cp Code.gs /tmp/SmartNote-Code.js
-          node --check /tmp/SmartNote-Code.js
           node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8'))"
           npm run test:smoke
       - name: Prepare web assets and bundle native bridges
         run: npm run prepare:android
       - name: Prepare standalone web build
-        run: |
-          mkdir -p web-build
-          cp index.html app.js styles.css theme.js language.js manifest.json sw.js www/lucide.min.js web-build/
-          cp www/native-notifications.bundle.js www/native-back.bundle.js web-build/
-          if [ -d icons ]; then cp -r icons web-build/icons; fi
+        run: npm run prepare:web
       - name: Upload web build
         uses: actions/upload-artifact@v4
         with:
           name: smartnote-web-build
-          path: upgrade version/web-build/
+          path: web-build/
           if-no-files-found: error
       - name: Create Android project
         run: npx cap add android
+      - name: Configure Firebase Android app
+        run: |
+          mkdir -p android/app
+          cp google-services.json android/app/google-services.json
+          sed -i "/dependencies {/a\\        classpath 'com.google.gms:google-services:4.4.2'" android/build.gradle
+          printf "%s\\n" "apply plugin: 'com.google.gms.google-services'" >> android/app/build.gradle
       - name: Sync Capacitor plugins
         run: npx cap sync android
       - name: Keep Android app below system bars
@@ -74,7 +85,12 @@ jobs:
         run: |
           MAIN_ACTIVITY="$(find android/app/src/main/java -type f -name MainActivity.java -print -quit)"
           if [ -z "$MAIN_ACTIVITY" ]; then echo "Capacitor MainActivity.java was not generated"; exit 1; fi
-          PACKAGE_NAME="$(sed -n 's/^package \\(.*\\);/\\1/p' "$MAIN_ACTIVITY" | head -n 1)"
+          PACKAGE_NAME="$(awk '/^[[:space:]]*package[[:space:]]/ { gsub(/;/, "", $2); print $2; exit }' "$MAIN_ACTIVITY")"
+          if [ -z "$PACKAGE_NAME" ]; then
+            PACKAGE_DIR="${MAIN_ACTIVITY#android/app/src/main/java/}"
+            PACKAGE_NAME="${PACKAGE_DIR%/MainActivity.java}"
+            PACKAGE_NAME="${PACKAGE_NAME//\//.}"
+          fi
           if [ -z "$PACKAGE_NAME" ]; then echo "Could not detect MainActivity package"; exit 1; fi
           cat > "$MAIN_ACTIVITY" <<JAVA
           package ${PACKAGE_NAME};
@@ -118,5 +134,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: smartnote-debug-apk
-          path: upgrade version/android/app/build/outputs/apk/debug/app-debug.apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

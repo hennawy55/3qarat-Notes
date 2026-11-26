@@ -1,8 +1,12 @@
-const CACHE = 'smartnote-offline-shell-v26';
+const CACHE = 'smartnote-offline-shell-v32';
 const ASSETS = [
   './index.html',
+  './index-en.html',
+  './index-ar.html',
+  './app.en.js',
   './styles.css',
   './app.js',
+  './app.ar.js',
   './theme.js',
   './language.js',
   './manifest.json',
@@ -40,7 +44,7 @@ self.addEventListener('fetch', event => {
         const response = await fetch(request);
         if (response && response.ok) {
           const cache = await caches.open(CACHE);
-          await cache.put('./index.html', response.clone());
+          await cache.put(request, response.clone());
         }
         return response;
       } catch {
@@ -70,15 +74,19 @@ self.addEventListener('fetch', event => {
 
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  const taskId = event.notification.data && event.notification.data.taskId;
-  const alertKey = event.notification.data && event.notification.data.key;
-  if (!taskId) return;
+  const data = event.notification.data || {};
+  const taskId = data.taskId;
+  const assignmentId = data.assignmentId;
+  const alertKey = data.key;
+  if (!taskId && !assignmentId) return;
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     for (const client of windows) {
-      client.postMessage({ type: 'OPEN_TASK_NOTIFICATION', taskId, key: alertKey });
+      if (assignmentId) client.postMessage({ type: 'OPEN_ASSIGNED_NOTIFICATION', assignmentId, notificationId: data.notificationId });
+      else client.postMessage({ type: 'OPEN_TASK_NOTIFICATION', taskId, key: alertKey });
       if ('focus' in client) return client.focus();
     }
-    return self.clients.openWindow(`./?openTask=${encodeURIComponent(taskId)}`);
+    const target = taskId ? `./?openTask=${encodeURIComponent(taskId)}` : './';
+    return self.clients.openWindow(target);
   })());
 });
